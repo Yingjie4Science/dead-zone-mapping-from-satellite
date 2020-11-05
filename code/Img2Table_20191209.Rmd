@@ -8,8 +8,8 @@ editor_options:
 ---
 
 
-Tidy the data table extracted from MODIS images
-YingjieLi.edu@gmail.com
+Tidy the data table extracted from MODIS images.
+
 update on: 2019-11-01
 
 
@@ -50,14 +50,14 @@ ms_to_date = function(ms, t0="1970-01-01", timezone) {
 
 
 
-###################################### #
 #  Data
-###################################### #
-
 ##  Station info (st)
 ```{r}
 
 ```
+
+
+
 
 
 ##  RS data
@@ -123,6 +123,9 @@ names(data3)
 ```
 
 
+
+
+
 ### Data Perpare (simplified code)
 ```{r}
 path_data <- './Img2Table/Img2Table_04_20191115'
@@ -164,8 +167,6 @@ for (csv in csv_ls) {
   data <- rbind(data, csv_df)
 }
 
-
-
 ### save as csv
 fname <- paste0('./Img2Table/data_processed/', 
                 yr, '_', sensor, today, '.csv'); fname
@@ -174,6 +175,8 @@ fname <- paste0('./Img2Table/data_processed/',
 
 names(data)
 ```
+
+
 
 
 *data cleaning Test*
@@ -219,6 +222,9 @@ d4 <- case_when(nchar(d2) <= 7  ~ as.Date(d2, "%d%b%y"),
                 nchar(d2) >= 13 ~ as.Date(ms_to_date(d2, timezone="UTC")));
 d4
 ```
+
+
+
 
 ### Data cleaning
 ```{r}

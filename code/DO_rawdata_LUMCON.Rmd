@@ -14,21 +14,37 @@ editor_options:
 ### To clear your environment 
 remove(list = ls())
 
-### set work dir
-path <- rstudioapi::getSourceEditorContext()$path
-dir  <- dirname(rstudioapi::getSourceEditorContext()$path); dir
-setwd(dir)
 
-dir.ctd <- './DO_LUMCON/Rabalais_zip'
-setwd(dir.ctd); getwd()
-
-today <- format(Sys.time(), "%Y%m%d"); print(today)
 
 library(tidyverse)
 library(dplyr)
 library(rlist)
 library(lubridate)
+
 library(cowplot)
+library(ggpubr)
+
+
+
+### Set work dir ----------------------------------------------------------
+path <- rstudioapi::getSourceEditorContext()$path
+dir  <- dirname(rstudioapi::getSourceEditorContext()$path); dir
+dirname(dir)        ## go to parent dir
+setwd(dirname(dir)) ## set this parent dir as root dir
+getwd()
+
+### the data fir 
+dir.path <- './data/DO/DO_GOM/DO_LUMCON/'
+setwd(dir.path)
+getwd()
+
+dir.data   <- './data_Rabalais'
+dir.fig    <- './figures/'
+dir.output <- './data_cleaned/'
+
+
+today <- format(Sys.time(), "%Y%m%d"); print(today)
+
 ```
 
 
@@ -37,39 +53,41 @@ library(cowplot)
   NCEI Accession_LUMCON SeaBird
 ## unzip all  
 
-```{r}
+```{r eval=FALSE, include=FALSE}
 getwd()
-list.dirs(path = './', full.names = T, recursive = T) 
-list.files(path = './', pattern = '*.gz', full.names = T)
+list.dirs(path  = dir.data, full.names = T, recursive = T) 
+ls.gz <- list.files(path = dir.data, pattern = '*.gz', full.names = T); ls.gz
 
-ls.gz <- list.files(path = './', pattern = '*.gz', full.names = T)
-
+dir.unzip <- paste0(dir.data, '/unzip'); dir.unzip
 for (f in ls.gz) {
   print(f)
   ### unzip files
   untar(tarfile = f, list=TRUE)  ## check contents
-  untar(tarfile = f, exdir = './unzip')
+  untar(tarfile = f, exdir = dir.unzip)
 }
 ```
 
 
 
-## Example 
+## Example for cleaning
+
 ### For 2016/2015/2014/2013/2012
 ```{r}
+dir.unzip <- paste0(dir.data, '/unzip'); dir.unzip
+
 yr <- 2015
 
 getwd()
 # list.dirs(path = './', full.names = T, recursive = T) 
-list.files(path = './', pattern = paste0('*', yr, '.*'), full.names = T, recursive = T)
+list.files(path = dir.unzip, pattern = paste0('*', yr, '.*'), full.names = T, recursive = T)
 
-st <- list.files(path = './', pattern = paste0(yr, '_StationList.csv'), full.names = T, 
+st <- list.files(path = dir.unzip, pattern = paste0(yr, '_StationList.csv'), full.names = T, 
                  recursive = T, all.files = T, ignore.case = T); st
 
-sb <- list.files(path = './', pattern = paste0(yr, '_Seabird.csv'), full.names = T, 
+sb <- list.files(path = dir.unzip, pattern = paste0(yr, '_Seabird.csv'), full.names = T, 
                  recursive = T, all.files = T, ignore.case = T); sb
 
-ys <- list.files(path = './', pattern = paste0(yr, '_YSI6820.csv'), full.names = T, 
+ys <- list.files(path = dir.unzip, pattern = paste0(yr, '_YSI6820.csv'), full.names = T, 
                  recursive = T, all.files = T, ignore.case = T); ys
 
 
@@ -85,13 +103,13 @@ ys0 <- read.csv(file = ys, stringsAsFactors = F);
 ```{r}
 yr <- 2011; sep = "|"
 ### FOR 2011 DATA
-st <- list.files(path = './', pattern = paste0(yr, '_StationList.csv'), full.names = T, 
+st <- list.files(path = dir.unzip, pattern = paste0(yr, '_StationList.csv'), full.names = T, 
                  recursive = T, all.files = T, ignore.case = T); st
 
-sb <- list.files(path = './', pattern = paste0(yr, '_Seabird.csv'), full.names = T, 
+sb <- list.files(path = dir.unzip, pattern = paste0(yr, '_Seabird.csv'), full.names = T, 
                  recursive = T, all.files = T, ignore.case = T); sb
 
-ys <- list.files(path = './', pattern = paste0(yr, '_YSI6820.csv'), full.names = T, 
+ys <- list.files(path = dir.unzip, pattern = paste0(yr, '_YSI6820.csv'), full.names = T, 
                  recursive = T, all.files = T, ignore.case = T); ys
 
 st0 <- read.csv(file = st, stringsAsFactors = F, sep = sep); 
@@ -105,13 +123,13 @@ ys0 <- read.csv(file = ys, stringsAsFactors = F, sep = sep);
 ```{r}
 yr <- 2010
 
-st <- list.files(path = './', pattern = paste0(yr, '_StationList.txt'), full.names = T, 
+st <- list.files(path = dir.unzip, pattern = paste0(yr, '_StationList.txt'), full.names = T, 
                  recursive = T, all.files = T, ignore.case = T); st
 
-sb <- list.files(path = './', pattern = paste0(yr, '_Seabird.txt'), full.names = T, 
+sb <- list.files(path = dir.unzip, pattern = paste0(yr, '_Seabird.txt'), full.names = T, 
                  recursive = T, all.files = T, ignore.case = T); sb
 
-ys <- list.files(path = './', pattern = paste0(yr, '_YSI6820.txt'), full.names = T, 
+ys <- list.files(path = dir.unzip, pattern = paste0(yr, '_YSI6820.txt'), full.names = T, 
                  recursive = T, all.files = T, ignore.case = T); ys
 
 ### for 2010 data
@@ -215,6 +233,7 @@ ys1 <- ys1 %>%
 sb2 <- merge(x = sb1, y = st1, by.x = 'stationid', by.y = 'stationid', all.x = T) %>%
   as.data.frame() %>%
   dplyr::mutate(
+    oxygen = as.numeric(oxygen),
     # date = as.Date(date, "%m/%d/%Y"),
     
     # date = case_when(grepl(pattern = '[\\/]', x = date) ~ as.Date(date, "%m/%d/%y"),
@@ -230,6 +249,7 @@ sb2 <- merge(x = sb1, y = st1, by.x = 'stationid', by.y = 'stationid', all.x = T
 ys2 <- merge(x = ys1, y = st1, by.x = 'stationid', by.y = 'stationid', all.x = T) %>%
   as.data.frame() %>%
   dplyr::mutate(
+    do = as.numeric(do),
     date = gsub(pattern = '[\\-]', replacement = '/', x = date), 
     date = case_when(nchar(date) >=  8  ~ as.Date(date, "%m/%d/%Y"),
                      nchar(date) < 8  ~ as.Date(date, "%m/%d/%y")),
@@ -259,31 +279,52 @@ length(unique(ys2$station))
 ```
 
 
+
+
+
+
 ```{r Data description}
+str(sb2)
+
 hist(sb2$oxygen)
 hist(ys2$do)
 
-### sampling at what time, and how many samples
-sb2 %>% ggplot() +  ## July 25 ~ Aug 5
-  geom_bar(aes(x = date)) + 
-  scale_x_date(date_breaks = "1 day", date_labels =  "%m-%d") + ## %Y-%m-%d
+### sampling at what time, and how many samples ----------------------------------------------
+p_n_by_day1 <- 
+  sb2 %>% 
+  group_by(date) %>%
+  tally() %>%
+  ggplot() +  
+  geom_col(aes(x = date, y = n)) + 
+  scale_x_date(date_breaks = "5 day", date_labels =  "%m-%d") +    ## %Y-%m-%d
   theme_bw() +
-  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+  theme(axis.text.x = element_text(angle = 90, hjust = 1))         ## most during July 25 ~ Aug 5
 
-ys2 %>% filter(month(date) > 6 & month(date) < 9) %>%
+p_n_by_day2 <- 
+  ys2 %>% 
+  group_by(date) %>%
+  tally() %>%
+  # filter(month(date) > 6 & month(date) < 9) %>%
   ggplot() +
-  geom_bar(aes(x = date)) + 
-  scale_x_date(date_breaks = "1 day", date_labels =  "%m-%d") +
+  geom_col(aes(x = date, y = n)) + 
+  scale_x_date(date_breaks = "5 day", date_labels =  "%m-%d") +
   theme_bw() +
-  theme(axis.text.x = element_text(angle = 90, hjust = 1))
+  theme(axis.text.x = element_text(angle = 90, hjust = 1))         ## most during 7-20 ~ 7-30
+
+ggarrange(p_n_by_day1, p_n_by_day1, labels = 'AUTO')
+fname <- paste0(dir.fig, 'Samping num by date.png'); fname
+ggsave(filename = fname, plot = last_plot(), dpi = 300, width = 14, height = 7)
 
 
+
+
+### DO level by depth and change over time ----------------------------------------------------
 ggplot(data = sb2) +
   geom_point(aes(x = date, y = oxygen, color = depth)) +
   # facet_wrap(~year,
   #            # scales = 'free_y',
   #            ncol = 3)+
-  scale_x_date(date_breaks = "1 day", date_labels =  "%m-%d") +
+  scale_x_date(date_breaks = "5 day", date_labels =  "%m-%d") +
   # facet_wrap(~station)+
   theme_bw() +
   geom_hline(yintercept=2, linetype="dashed", color = "red")+
@@ -298,7 +339,7 @@ ggplot(data = sb2) +
   # facet_wrap(~year,
   #            # scales = 'free_y',
   #            ncol = 3)+
-  scale_x_date(date_breaks = "1 day", date_labels =  "%m-%d") +
+  scale_x_date(date_breaks = "5 day", date_labels =  "%m-%d") +
   facet_wrap(~station)+
   theme_bw() +
   geom_hline(yintercept=2, linetype="dashed", color = "red")+
@@ -308,8 +349,8 @@ ggplot(data = sb2) +
 
 
 getwd()
-# fname <- paste0('./process/Samping DO by date across station', '.png'); fname
-# ggsave(filename = fname, plot = last_plot(), dpi = 300, width = 14, height = 14)
+fname <- paste0(dir.fig, 'Samping DO by date across station.png'); fname
+ggsave(filename = fname, plot = last_plot(), dpi = 300, width = 14, height = 14)
 
 ```
 

@@ -7,24 +7,37 @@ output:
 ---
 
 
+This script aims to clean CDT data collected from NOAA, as described in "_DO_data_sources.xlsx".
 
-
-
+# Dirs and Packages
 ```{r}
 require(oce) ## for reading, processing and plotting oceanographic data.
 require(ocedata)
 ### Ref: https://semba-blog.netlify.com/10/04/2018/processing-ctd-data-with-oce-package-in-r/
-
-### set work dir
-path <- rstudioapi::getSourceEditorContext()$path
-dir  <- dirname(rstudioapi::getSourceEditorContext()$path); dir
-setwd(dir)
-getwd()
-today <- format(Sys.time(), "%Y%m%d"); print(today)
-
 library(tidyverse)
 library(rlist)
 library(lubridate)
+
+
+
+### Set work dir ----------------------------------------------------------
+path <- rstudioapi::getSourceEditorContext()$path
+dir  <- dirname(rstudioapi::getSourceEditorContext()$path); dir
+dirname(dir)        ## go to parent dir
+setwd(dirname(dir)) ## set this parent dir as root dir
+getwd()
+
+### the data dir 
+dir.path <- './data/DO/DO_GOM/DO_SEAMAP'
+setwd(dir.path)
+getwd()
+
+dir.fig    <- './figures/'
+dir.output <- './data_cleaned/'
+
+today <- format(Sys.time(), "%Y%m%d"); print(today)
+
+
 ```
 
 
@@ -33,24 +46,25 @@ library(lubridate)
 #  Data read in
 ## SEAMAP 1987-2017
 ```{r}
-dir.ctd <- './DO_SEAMAP/NOAA_NCEI_CTD'
-setwd(dir.ctd); getwd()
-list.dirs(path = './', full.names = T, recursive = T) 
-list.files(path = './', pattern = '*.gz', full.names = T)
+dir.ctd <- './NOAA_NCEI_CTD'
 
-f <- "./0172423.1.1.tar.gz"
+### unzip files
+list.dirs(path = dir.ctd, full.names = T, recursive = T) 
+list.files(path = dir.ctd, pattern = '*.gz', full.names = T)
 
+f <- paste0(dir.ctd, "/0172423.1.1.tar.gz")
 # library(R.utils)
 # gunzip(filename = f, remove=FALSE) ## can not get folder but still zip (.tar)
-
 untar(tarfile = f, list=TRUE)  ## check contents
-untar(tarfile = f, exdir = './unzip')
+untar(tarfile = f, exdir = paste0(dir.ctd, '/unzip'))
+
+
 
 getwd()
-list.dirs(path = './', full.names = T, recursive = T) 
-list.files(path = './', pattern = '*_data.csv', full.names = T, recursive = T)
+list.dirs(path  = dir.ctd, full.names = T, recursive = T) 
+list.files(path = dir.ctd, pattern = '*_data.csv', full.names = T, recursive = T)
 
-df2011_17 <- ".//unzip/0172423/1.1/data/1-data/MARMAPSEAMAPReefFishCTD2011-2017_data.csv"
+df2011_17 <- "./NOAA_NCEI_CTD/unzip/0172423/1.1/data/1-data/MARMAPSEAMAPReefFishCTD2011-2017_data.csv"
 dt2011_17 <- read.csv(file = df2011_17, stringsAsFactors = F)
 names(dt2011_17)
 
@@ -72,13 +86,13 @@ length(unique(num$Latitude)) # 2015: 69
 
 ## SEAMAP 2009-2015
 ```{r}
-f <- "./0131259.1.1.tar.gz"
-untar(tarfile = f, list=TRUE)  ## check contents
-untar(tarfile = f, exdir = './unzip')
+f <- paste0(dir.ctd, "/0131259.1.1.tar.gz")
+# untar(tarfile = f, list=TRUE)  ## check contents
+# untar(tarfile = f, exdir = './unzip')
 
-list.dirs(path = './', recursive = T)
-f.dir <- grep(pattern = '2015-Cruise313', 
-              x = list.dirs(path = './', recursive = T), value = T)
+list.dirs(path = dir.ctd, recursive = T)
+f.dir <- grep(pattern = '.*/2015-Cruise313$', 
+              x = list.dirs(path = dir.ctd, recursive = T), value = T)
 f.dir
 f.list <- list.files(path = f.dir, pattern = '*.cnv', recursive = T, full.names = T)
 f.list ## 243 files

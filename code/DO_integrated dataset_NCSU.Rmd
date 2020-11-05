@@ -17,6 +17,8 @@ library(xlsx)
 library(tidyverse)
 library(dplyr)
 library(proj4)
+library(stringr)
+library(scales)
 
 library(sf)
 library(maps)
@@ -37,8 +39,8 @@ setwd(dirname(dir)) ## set this parent dir as root dir
 getwd()
 
 ### the data fir 
-dir.data_raw <- './data/DO/DO_GOM/DO_Integrated_Matli_NCSU'
-setwd(dir.data_raw)
+dir.path <- './data/DO/DO_GOM/DO_Integrated_Matli_NCSU'
+setwd(dir.path)
 getwd()
 
 dir.fig    <- './figures/'
@@ -85,10 +87,10 @@ options(pillar.sigfig = 15)
 
 ### Read in data ------------------------------------------------------------
 getwd()
-list.files(path = './data', pattern = '.xlsx$', full.names = T)
+list.files(path = './data_raw', pattern = '.xlsx$', full.names = T)
 
-df1.xlsx <- list.files(path = './data', pattern = '^Summary.xlsx', full.names = T); df1.xlsx
-df2.xlsx <- list.files(path = './data', pattern = '^RawData.xlsx', full.names = T); df2.xlsx
+df1.xlsx <- list.files(path = './data_raw', pattern = '^Summary.xlsx', full.names = T); df1.xlsx
+df2.xlsx <- list.files(path = './data_raw', pattern = '^RawData.xlsx', full.names = T); df2.xlsx
 
 df11 <- read_excel(path = df1.xlsx, sheet = 1, col_names = T) # Summary
 df21 <- read_excel(path = df2.xlsx, sheet = 1, col_names = T) # SBToML
@@ -126,16 +128,16 @@ hh$EventID <- round(hh$EventID)
 st$EventID <- round(st$EventID)
 st$OEID    <- round(st$OEID)
 
-### fix - YEID should be string
-sb$YEID <- as.character(sb$YEID)
-hh$YEID <- as.character(hh$YEID)
-st$YEID <- as.character(st$YEID)
-
 ### fix - name
 names(sb)
 names(sb) <- gsub(pattern = '%', replacement = '', x = names(sb), ignore.case = T)
 names(hh) <- gsub(pattern = '%', replacement = '', x = names(hh), ignore.case = T)
 names(st) <- gsub(pattern = '%', replacement = '', x = names(st), ignore.case = T)
+
+### fix - YEID should be string
+sb$YEID <- as.character(sb$YEID)
+hh$YEID <- as.character(hh$YEID)
+st$YEID <- as.character(st$YEID)
 
 
 ### Save as R data ------------------------------------------------------------
@@ -147,7 +149,7 @@ names(st) <- gsub(pattern = '%', replacement = '', x = names(st), ignore.case = 
 
 
 # Data cleaning 
-```{r}
+```{r eval=FALSE, include=FALSE}
 
 ### To load the data again  ---------------------------------------------------
 getwd()
@@ -286,15 +288,11 @@ df.na.source <- df %>% filter(is.na(Source))     ## many ???????????????????????
 df.na.DO     <- df %>% filter(is.na(DO))         ## none
 
 
-## data description
-print(paste0('Total sample points:   ', nrow(df)))
-print(paste0('Total sample location: ', nrow(sp)))
-
 ### save to csv ---------------------------------------------------------------
 today <- format(Sys.time(), "%Y%m%d"); print(today)
 fnamerdt <- paste0(dir.output, 'DO_Integrated_Matli_NCSU_cleaned_', today, '.RData'); fnamerdt
 fnamecsv <- paste0(dir.output, 'DO_Integrated_Matli_NCSU_cleaned_', today, '.csv');   fnamecsv
-# save(df, file = fnamerdt)
+# save(df, sb, hh, sp, file = fnamerdt)
 # write.csv(df, file = fnamecsv)
 
 ```
@@ -302,6 +300,21 @@ fnamecsv <- paste0(dir.output, 'DO_Integrated_Matli_NCSU_cleaned_', today, '.csv
 
 
 
+
+
+```{r load cleaned data}
+list.files(path = dir.output, pattern = 'DO_Integrated.*\\.RData', full.names = T) 
+fname <- "./data_cleaned/DO_Integrated_Matli_NCSU_cleaned_20201104.RData"
+load(fname)
+```
+
+
+
+```{r data description}
+## data description
+print(paste0('Total sample points:   ', nrow(df)))
+print(paste0('Total sample location: ', nrow(sp)))
+```
 
 
 ```{r check data in 2015}
@@ -325,7 +338,7 @@ length(unique(as.character(df.2014$YEID))) ## 2014: 86
 
 
 ```{r check data from lsu}
-lsu <- sb.sp %>%
+lsu <- df %>%
   dplyr::filter(Source == 'LUMCON' & Year >= 2000) 
 
 str(lsu)
@@ -361,7 +374,7 @@ head(shp)
 
 ## 1. sample number stack bar by year ------------------------------------------------------------
 size_key = 0.4
-st %>% ggplot() + 
+sp %>% ggplot() + 
   geom_bar(aes(x=Year, fill = Source), position = "stack") + 
   ylab('Sampling sites') +
   scale_x_continuous(breaks = seq(1985, 2017, by = 2))+
@@ -386,8 +399,8 @@ ggsave(filename = pname, plot = last_plot(),  bg = "transparent",
 ggplot() + 
   # geom_polygon(data = shp, aes(x=long, y = lat, group = group), fill = 'gray90') + 
   # scale_fill_viridis_d(option = "viridis", alpha = 0.6)+
-  geom_point(data = st,  # use geom_point, instead of geom_sf
-             aes(x = lng, y = lat, color = Source), alpha = 0.9, size = 1.5) +
+  geom_point(data = sp,  # use geom_point, instead of geom_sf
+             aes(x = lon, y = lat, color = Source), alpha = 0.9, size = 1.5) +
   # scale_color_brewer(palette = "Dark2") +
   facet_wrap(.~Year)+
   theme_bw() +
@@ -403,8 +416,8 @@ ggsave(filename = pname, plot = last_plot(),
 
 ## 3. sample distribution facet by data source ---------------------------------------------------
 ggplot() + 
-  geom_point(data = st,  # use geom_point, instead of geom_sf
-             aes(x = lng, y = lat, color = Year), alpha = 0.5) +
+  geom_point(data = sp,  # use geom_point, instead of geom_sf
+             aes(x = lon, y = lat, color = Year), alpha = 0.5) +
   facet_wrap(.~Source)+
   # scale_color_gradient2(low = 'blue', mid = 'green', high = 'red', midpoint = 2000)+
   scale_color_viridis(option = "D") +

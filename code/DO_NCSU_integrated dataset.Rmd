@@ -10,13 +10,7 @@ editor_options:
 # To clear your environment 
 remove(list = ls())
 
-# Set work dir ----------------------------------------------------------
-path <- rstudioapi::getSourceEditorContext()$path
-dir  <- dirname(rstudioapi::getSourceEditorContext()$path); dir
-setwd(dir)
-setwd('./DO_Integrated_Matli_NCSU')
-getwd()
-today <- format(Sys.time(), "%Y%m%d"); print(today)
+
 library(readxl)
 library(XLConnect)
 library(xlsx)
@@ -32,6 +26,26 @@ library(RColorBrewer)
 library(viridis)
 # devtools::install_github("jaredhuling/jcolors")
 library(jcolors)
+
+
+
+### Set work dir ----------------------------------------------------------
+path <- rstudioapi::getSourceEditorContext()$path
+dir  <- dirname(rstudioapi::getSourceEditorContext()$path); dir
+dirname(dir)        ## go to parent dir
+setwd(dirname(dir)) ## set this parent dir as root dir
+getwd()
+
+### the data fir 
+dir.data_raw <- './data/DO/DO_GOM/DO_Integrated_Matli_NCSU'
+setwd(dir.data_raw)
+getwd()
+
+dir.fig    <- './figures/'
+dir.output <- './data_cleaned/'
+
+
+today <- format(Sys.time(), "%Y%m%d"); print(today)
 
 
 ## keep more decimals 
@@ -125,8 +139,8 @@ names(st) <- gsub(pattern = '%', replacement = '', x = names(st), ignore.case = 
 
 
 ### Save as R data ------------------------------------------------------------
-# save(dfsummary,  file = "./data/Summary.RData")
-# save(sb, hh, st, file = "./data/RawData.RData")
+# save(dfsummary,  file = paste0(dir.output, "Summary.RData"))
+# save(sb, hh, st, file = paste0(dir.output, "RawData.RData"))
 
 ```
 
@@ -137,8 +151,8 @@ names(st) <- gsub(pattern = '%', replacement = '', x = names(st), ignore.case = 
 
 ### To load the data again  ---------------------------------------------------
 getwd()
-load("./data/Summary.RData")
-load("./data/RawData.RData")
+load(paste0(dir.output, "Summary.RData"))
+load(paste0(dir.output, "RawData.RData"))
 
 
 ### convert UTM 15 N to lat/lon ----------------------------------------------
@@ -278,10 +292,10 @@ print(paste0('Total sample location: ', nrow(sp)))
 
 ### save to csv ---------------------------------------------------------------
 today <- format(Sys.time(), "%Y%m%d"); print(today)
-fnamerdt <- paste0("./data/", 'DO_Integrated_Matli_NCSU_cleaned_', today, '.RData'); fnamerdt
-fnamecsv <- paste0("./data/", 'DO_Integrated_Matli_NCSU_cleaned_', today, '.csv');   fnamecsv
-save(df, file = fnamerdt)
-write.csv(df, file = fnamecsv)
+fnamerdt <- paste0(dir.output, 'DO_Integrated_Matli_NCSU_cleaned_', today, '.RData'); fnamerdt
+fnamecsv <- paste0(dir.output, 'DO_Integrated_Matli_NCSU_cleaned_', today, '.csv');   fnamecsv
+# save(df, file = fnamerdt)
+# write.csv(df, file = fnamecsv)
 
 ```
 
@@ -361,7 +375,7 @@ st %>% ggplot() +
   #        fill  = guide_legend(override.aes = list(size = size_key))) +
   theme(legend.position = c(0.1, 0.8)) 
 
-pname <- paste0('./figures/', 'total_count_sample_bySources1.png'); pname
+pname <- paste0(dir.fig, 'total_count_sample_bySources1.png'); pname
 ggsave(filename = pname, plot = last_plot(),  bg = "transparent",
        width = 6, height = 6, units = 'in', dpi = 300)
 
@@ -380,7 +394,7 @@ ggplot() +
   guides(color = guide_legend(override.aes = list(size=4))) ## enlarge the key size
 
 getwd()
-pname <- paste0('./figures/', 'map_samp_by year1', '.png'); pname
+pname <- paste0(dir.fig, 'map_samp_by year1', '.png'); pname
 ggsave(filename = pname, plot = last_plot(), 
        width = 14, height = 8, units = 'in', dpi = 300)
 
@@ -395,7 +409,7 @@ ggplot() +
   # scale_color_gradient2(low = 'blue', mid = 'green', high = 'red', midpoint = 2000)+
   scale_color_viridis(option = "D") +
   theme_bw()
-pname <- paste0('./figures/', 'map_samp_by source1', '.png'); pname
+pname <- paste0(dir.fig, 'map_samp_by source1', '.png'); pname
 ggsave(filename = pname, plot = last_plot(), 
        width = 14, height = 8, units = 'in', dpi = 300)
 

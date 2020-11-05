@@ -1,0 +1,704 @@
+---
+title: "Untitled"
+author: "Yingjie"
+date: "11/1/2019"
+output: html_document
+editor_options: 
+  chunk_output_type: console
+---
+
+
+Tidy the data table extracted from MODIS images
+YingjieLi.edu@gmail.com
+update on: 2019-11-01
+
+
+# Setup
+```{r Dirs and Packages}
+### To clear your environment 
+# remove(list = ls())
+
+# set work dir
+path <- rstudioapi::getSourceEditorContext()$path
+dir  <- dirname(rstudioapi::getSourceEditorContext()$path); dir
+setwd(dir)
+getwd()
+today <- format(Sys.time(), "%Y%m%d"); print(today)
+
+library(tidyverse)
+library(dplyr)
+library(rlist)
+library(lubridate)
+library(cowplot)
+```
+
+
+```{r Functions}
+### define a convert function 
+ms_to_date = function(ms, t0="1970-01-01", timezone) {
+        ## @ms: a numeric vector of milliseconds (big integers of 13 digits)
+        ## @t0: a string of the format "yyyy-mm-dd", specifying the date that
+        ##      corresponds to 0 millisecond
+        ## @timezone: a string specifying a timezone that can be recognized by R
+        ## return: a POSIXct vector representing calendar dates and times        
+        sec = as.numeric(ms) / 1000
+        as.POSIXct(sec, origin=t0, tz=timezone)
+}
+```
+
+
+
+
+
+###################################### #
+#  Data
+###################################### #
+
+##  Station info (st)
+```{r}
+
+```
+
+
+##  RS data
+  test code
+```{r eval=FALSE, include=FALSE}
+path_data <- './Img2Table/Img2Table_04_20191115'
+sensor    <- 'aqua_'
+# sensor    <- 'terr_'
+yr        <- 2015
+
+# read csv
+pattern_file <- paste0('^', year, '_', sensor, '*'); print(pattern_file)
+csv_ls <- list.files(path = path_data, pattern = pattern_file, full.names = T)
+csv_ls; length(csv_ls) ## should be 14
+
+## a blank df
+data <- data.frame()
+
+for (csv in csv_ls) {
+  # print(csv)
+  band_name <- gsub(pattern = '.csv', replacement = '', 
+                    x = gsub(pattern = paste0(path_data, '/'), 
+                             replacement = '', x = csv))
+  print(band_name)
+  
+  csv_df <- read.csv(file = csv, header = T, stringsAsFactors = F)
+  csv_df <- cbind(band = band_name, csv_df) ## add band name col
+  data <- rbind(data, csv_df)
+}
+
+## check data lenght (total row number)
+print(length(data$system.index)) ## final combined data
+print(length(csv_ls) * length(csv_df$system.index)) ## 14 csv files * 243 stations in each 
+
+### change the col names
+### update the coverage of data on July 9, 2019
+
+## way#1
+# date_list <- names(data)[3:(length(names(data))-21)]; date_list
+# date_list <- gsub('X', '',  date_list); date_list
+# date_list <- gsub('\\.', '-',  date_list); date_list
+
+## way#2
+date_list <- seq(from = as.Date(paste0(yr, '-02-01')), 
+                 to   = as.Date(paste0(yr, '-09-30')), by = 1) %>% as.character()
+# cols_dates <- gsub('\.', '/', cols_dates)
+print(date_list) ## 107 ## 241
+names(data)[3:(3+length(date_list)-1)] <- as.character(date_list)
+names(data)
+
+## subset data
+data2 <- data %>% 
+  dplyr::select(
+    band, date_list, 
+    matches('dateutc|station|latitude|longitude|oxmgl|depth', ignore.case = T))
+names(data2)
+
+## rename colums
+data3 <- data2 %>%
+  setNames(c('band', date_list,'dateUTC', 'station',
+             'latitude','longitude','oxmgl','depth'))
+names(data3)
+```
+
+
+### Data Perpare (simplified code)
+```{r}
+path_data <- './Img2Table/Img2Table_04_20191115'
+sensor    <- 'aqua_'
+# sensor    <- 'terr_'
+yr        <- 2015
+
+# read csv
+pattern_file <- paste0('^', yr, '_', sensor, '*'); print(pattern_file)
+csv_ls <- list.files(path = path_data, pattern = pattern_file, full.names = T)
+csv_ls; length(csv_ls) ## should be 14
+
+## a blank df
+data      <- data.frame()
+date_list <- seq(from = as.Date(paste0(yr, '-02-01')), 
+                 to   = as.Date(paste0(yr, '-09-30')), by = 1) %>% as.character()
+
+for (csv in csv_ls) {
+  # print(csv)
+  band_name <- gsub(pattern = '.csv', replacement = '', 
+                    x = gsub(pattern = paste0(path_data, '/'), 
+                             replacement = '', x = csv))
+  print(band_name)
+  csv_df <- read.csv(file = csv, header = T, stringsAsFactors = F)
+  ## add band name col
+  csv_df <- cbind(band = band_name, csv_df) 
+  ## rename cols with date
+  names(csv_df)[3:(3+length(date_list)-1)] <- as.character(date_list)
+  ## select cols of interest
+  csv_df <- csv_df %>% 
+    dplyr::select(band, date_list, 
+                  matches('date|station|latitude|longitude|oxmgl|depth', ignore.case = T)) %>%
+    rename_all(tolower)  %>% 
+    select(band, date_list, 
+           'dateutc', 'station', 'latitude','longitude','oxmgl', everything()) %>%
+    setNames(c('band', date_list,'dateutc', 'station', 'latitude','longitude','oxmgl','depth'))
+  
+  ## row bind
+  data <- rbind(data, csv_df)
+}
+
+
+
+### save as csv
+fname <- paste0('./Img2Table/data_processed/', 
+                yr, '_', sensor, today, '.csv'); fname
+# fname <- './Img2Table_2015_auqa/data_processed/terr_data_2015_update.csv'
+# write.csv(x = data, file = fname)
+
+names(data)
+```
+
+
+*data cleaning Test*
+```{r include=FALSE}
+### change all "No data" as NA
+data2 <- data  %>% 
+  mutate_all(~na_if(., 'No data'))
+
+#### TEST: check UTC DATE foramt, and remove Special characters
+####  for example, some date looks like 15-JUN-16, instead of 15JUN16
+d1 = data2$dateutc[1]; d1
+
+## 1) date include special char, such as "-"
+d2 = gsub("[^0-9A-Za-z///' ]","" , d1 ,ignore.case = TRUE); d2
+nchar(d2)
+
+## 2) year using 2 or 4 digits
+d3 = as.Date(d2, "%d%b%y"); d3 # %y	Year (2 digit)
+d3 = as.Date(d2, "%d%b%Y"); d3 # %Y	Year (4 digit)
+
+## 3) date in milliseconds, instead of normal date format 
+##    https://developers.google.com/earth-engine/tutorial_js_02
+### define a convert function 
+ms_to_date = function(ms, t0="1970-01-01", timezone) {
+        ## @ms: a numeric vector of milliseconds (big integers of 13 digits)
+        ## @t0: a string of the format "yyyy-mm-dd", specifying the date that
+        ##      corresponds to 0 millisecond
+        ## @timezone: a string specifying a timezone that can be recognized by R
+        ## return: a POSIXct vector representing calendar dates and times        
+        sec = as.numeric(ms) / 1000
+        as.POSIXct(sec, origin=t0, tz=timezone)
+}
+
+d31 <- ms_to_date(d2, timezone="UTC") %>% as.Date()
+d31 
+# as.Date(d5, format = "%Y-%m-%d %H:%M:%S")
+# as.Date(d5)
+nchar(d2)
+str(d2)
+
+d4 <- case_when(nchar(d2) <= 7  ~ as.Date(d2, "%d%b%y"),
+                nchar(d2) <  13 ~ as.Date(d2, "%d%b%Y"), ## len = 9
+                nchar(d2) >= 13 ~ as.Date(ms_to_date(d2, timezone="UTC")));
+d4
+```
+
+### Data cleaning
+```{r}
+### change all "No data" as NA
+data2 <- data  %>% 
+  mutate_all(~na_if(., 'No data'))
+
+names(data2)
+### wide to long format
+data3 <- data2 %>% as.data.frame() %>%
+  gather(key = 'date_rs', value = 'rs', 2:(2+length(date_list)-1)) %>%
+  dplyr::mutate(
+    date_rs = as.Date(date_rs),
+    DateUTC = gsub("[^0-9A-Za-z///' ]", "", x = dateutc, ignore.case = TRUE), 
+              ### remove Special characters
+    date_sp = case_when(nchar(DateUTC) >= 13 ~ as.Date(ms_to_date(DateUTC, timezone="UTC")),
+                        nchar(DateUTC) <  13 ~ as.Date(DateUTC, "%d%b%Y"),
+                        nchar(DateUTC) <= 7  ~ as.Date(DateUTC, "%d%b%y")),
+    band    = gsub(pattern = paste0(yr, '_', sensor), replacement = '', x = band))
+
+names(csv_df)
+length(date_list)            ## how many days?     - 242
+length(csv_df$band)  ## how many stations? - 
+length(csv_ls)               ## how many bands?    - 14
+length(date_list) * length(csv_df$band) * length(csv_ls) ## total obs.
+length(date_list) * length(csv_df$band) * length(csv_ls) == length(data3[,1])
+
+```
+
+
+
+
+##   Viz
+###  Window 1=8
+#### Rrs_byBand_byDO in dif time window
+```{r}
+### filter a time_window
+i <- 8*7 ## 8 weeks ago
+t.window.i <- paste0(i, '_', i+7, '_d before'); t.window.i
+w.window.i <- paste0('-', i/7+1, ' week'); t.window.i
+
+names(data3)
+data4 <- data3 %>%
+  mutate(rs = as.numeric(rs))  %>%
+  select('station', 'date_sp', 'oxmgl','date_rs', 'band', 'rs') %>%
+  filter(date_rs <= (date_sp - i) & date_rs >= (date_sp - i -7)) %>%
+  mutate(t.window = paste0(i, '_', i+7, '_d before'),
+         w.window = paste0('-', i/7+1, ' week'))
+
+
+
+### change to the similar scale of the numbers
+data5 <- data4 %>%
+  dplyr::filter(!is.na(rs)) %>%
+  dplyr::mutate(
+    rs2 = case_when(band == 'chlor_a' ~ rs*2,
+                    band == 'nflh'    ~ rs*10^2,
+                    band == 'poc'     ~ rs/10^2,
+                    band == 'sst'     ~ rs,
+                    TRUE              ~ rs*10^4)) %>%
+  dplyr::ungroup() %>%
+  dplyr::group_by(station, oxmgl, band, t.window, w.window) %>%
+  dplyr::summarise(Rrs_mean = mean(rs2, na.rm = TRUE)) %>% as.data.frame()
+
+  
+names(data5)
+## same way, but if_else look more complex
+# data5 <- data4 %>%
+#   filter(!is.na(rs)) %>%
+#   dplyr::mutate(
+#     rs2 = if_else(
+#       band == 'chlor_a',   rs*2, if_else(
+#         band == 'nflh',    rs*10^2, if_else(
+#           band == 'poc',   rs/10^1/3, if_else(
+#             band == 'sst', rs, rs*10^4))))) %>%
+#   group_by(featureID, OxMgL, band) %>%
+#   summarise(Rrs_mean = mean(rs2, na.rm = TRUE))
+
+hist(data5$Rrs_mean)
+
+
+
+
+Plot_Rrs_byBand_byDO <- function(df) {
+  ggplot(data = df, aes(x = band, y = (Rrs_mean), 
+                        group = station,
+                        color = oxmgl)) +
+  geom_line(alpha = 0.5) +
+  # geom_point(aes(color = OxMgL)) +
+  theme_bw() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))+
+  xlab('Bands') + ylab('Rrs') 
+}
+
+### run function
+Plot_Rrs_byBand_byDO(data5) + ggtitle(w.window.i)
+fname <- paste0('./Img2Table/Figures/', 
+                yr, '_', sensor, 'Rrs_byBand_byDO_', 
+                t.window.i, '1.png'); fname
+ggsave(filename = fname, plot = last_plot(), 
+       dpi = 300, width = 7, height = 4)
+
+# data6 <- data5 %>%
+#   filter(band == 'chlor_a')
+
+hist(data5$Rrs_mean)
+min(data5$Rrs_mean)
+
+x= data5$Rrs_mean
+n <- length(x)
+sort(x, partial = 2)[1:50]
+```
+
+
+
+
+#### Rrs_vs_DO
+```{r}
+Plot_Rrs_vs_DO <- function(df) {
+  ggplot(data = df, aes(y = oxmgl, 
+                           # x = Rrs_mean,
+                           x = log(Rrs_mean),
+                           color = oxmgl)) +
+    geom_point(alpha = 0.8) +
+    geom_smooth(method = 'loess', formula = 'y ~ x') +
+    facet_wrap(~band, scales = 'free_x')+
+    geom_hline(yintercept=2, linetype="dashed", color = "gray", size=0.5)+
+    theme_bw()+ 
+    ggtitle(w.window.i) +
+    ylab('DO (mg/l)') 
+}
+
+### run function
+Plot_Rrs_vs_DO(data5)
+fname <- paste0('./Img2Table/Figures/', 
+                yr, '_', sensor, 'Rrs_vs_OD_', 
+                t.window.i, '2.png'); fname
+ggsave(filename = fname, plot = last_plot(), dpi = 300, width = 7, height = 6)
+```
+
+
+
+###  Loop by time.window
+#### Data
+```{r}
+### filter time window
+### select images with a week of sampling
+seq(0, 63, by = 7)
+dfs <- data.frame()
+for (i in seq(0, 63, by = 7)) {
+  print(- (i/7+1))
+  # print(- i - 7)
+  print(paste0(i, '_', i+7, '_d before'))
+  print('-----------------------------')
+  
+  data41 <- data3 %>%
+    dplyr::mutate(rs = as.numeric(rs))  %>%
+    dplyr::select('station', 'date_sp', 'oxmgl', 'date_rs', 'band', 'rs') %>%
+    # filter(featureID == 'id_1') %>%
+    dplyr::filter(date_rs <= (date_sp -  i) & date_rs >= (date_sp - i - 7)) %>%
+    dplyr::mutate(t.window = paste0(i, '_', i+7, '_d before'),
+                  w.window = paste0('-', i/7+1, ' week'))
+
+  # data5 <- data4 %>%
+  #   filter(!is.na(rs)) %>%
+  #   dplyr::mutate(
+  #     rs2 = if_else(
+  #       band == 'chlor_a',   rs, if_else(
+  #         band == 'nflh',    rs*10^2, if_else(
+  #           band == 'poc',   rs/10^2, if_else(
+  #             band == 'sst', rs, rs*10^4))))) %>%
+  #   group_by(featureID, OxMgL, band, t.window) %>%
+  #   summarise(Rrs_mean = mean(rs2, na.rm = TRUE)) %>% as.data.frame()
+  
+  data51 <- data41 %>%
+    dplyr::filter(!is.na(rs)) %>%
+    dplyr::mutate(
+      rs2 = case_when(band == 'chlor_a' ~ rs*2,
+                      band == 'nflh'    ~ rs*10^2,
+                      band == 'poc'     ~ rs/10^2,
+                      band == 'sst'     ~ rs,
+                      TRUE              ~ rs*10^4)) %>%
+    dplyr::ungroup() %>%
+    dplyr::group_by(station, oxmgl, band, t.window, w.window) %>%
+    dplyr::summarise(Rrs_mean = mean(rs2, na.rm = TRUE)) %>% as.data.frame()
+
+  dfs <- rbind(dfs, data51)
+}
+
+unique(dfs$t.window)
+```
+
+
+#### Rrs_byBand_byDO
+```{r}
+# ggplot(data = dfs, aes(x = band, y = (Rrs_mean), 
+#                        group=featureID,
+#                        color = OxMgL)) +
+#   geom_line(alpha = 0.4, size = 1) +
+#   # geom_point(aes(color = OxMgL)) +
+#   facet_wrap(~t.window)+
+#   theme_bw()+
+#   theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+Plot_Rrs_byBand_byDO(dfs) + facet_wrap(~w.window)
+fname <- paste0('./Img2Table/Figures/', 
+                yr, '_', sensor, 'Rrs_byBnad_byDO_byTimeWindow2.png'); 
+fname
+ggsave(filename = fname, plot = last_plot(), dpi = 200, width = 14, height = 7)
+
+colSums(is.na(dfs))
+df.na <- dfs %>% filter(is.na(Rrs_mean))
+```
+
+
+
+#### Rrs_vs_DO
+```{r}
+for (i in seq(0, 63, by = 7)) {
+  t.window.i = paste0(i, '_', i+7, '_d before'); print(t.window.i)
+  w.window.i = paste0('-', i/7+1, ' week'); print(w.window.i)
+  dfs.i <- dfs %>%
+    dplyr::filter(w.window == w.window.i)
+  
+  ## plot
+  Plot_Rrs_vs_DO(dfs.i)
+  fname <- paste0('./Img2Table/Figures/', yr, '_', sensor,
+                  'Rrs_vs_OD_',
+                  w.window.i, '.png'); fname
+  ggsave(filename = fname, plot = last_plot(),
+         dpi = 300, width = 7, height = 6)
+}
+```
+
+
+
+
+
+
+
+###############################################
+#  Pool multiple yrs together and plot
+###############################################
+
+## Data
+```{r}
+path_data <- './Img2Table/Img2Table_04_20191115'
+# sensor    <- 'aqua_'
+sensor    <- 'terr_'
+# year      <- 2015
+
+# read csv
+pattern_file <- paste0('^201', '(.*)', sensor, '(.*)'); print(pattern_file)
+
+csv_ls <- list.files(path = path_data, pattern = pattern_file, full.names = T)
+csv_ls; length(csv_ls) ## should be 14
+
+(2018-2010 + 1)*14
+
+## a blank df
+data      <- data.frame()
+date_df   <- data.frame()
+
+for (csv in csv_ls) {
+  print(csv)
+  yr <- as.numeric(substr(csv, 35, 38)); print(yr)
+  date_list <- seq(from = as.Date(paste0(yr, '-02-01')),
+                   to   = as.Date(paste0(yr, '-09-30')), by = 1) %>% as.character()
+  n_days <- length(date_list)
+  y_d    <- data.frame(year = yr, n_d = n_days)
+  date_df <- rbind(date_df, y_d)
+}
+
+date_df <- unique(date_df)
+## to account the total number of days across years
+n_days_yrs <- 0
+
+for (csv in csv_ls) {
+  print(csv)
+  ## read in csv
+  csv_df <- read.csv(file = csv, header = T, stringsAsFactors = F)
+  
+  ### get the year info, and date list
+  yr         <- as.numeric(substr(csv, 35, 38)); print(yr)
+  ## way #1
+  # date_list  <- seq(from = as.Date(paste0(yr, '-02-01')),to   = as.Date(paste0(yr, '-09-30')), by = 1) %>% as.character()
+  ## way #2
+  ##  for 2016 terra data, 2016-02-18 ~ 02-26 are missing, so way #1 will cause errors
+  csv_dates  <- csv_df %>% dplyr::select(matches(paste0('X', yr), ignore.case = T)); names(csv_dates)
+  date_list  <- names(csv_dates) %>% gsub('X', '', .) %>% gsub('\\.', '-', .); date_list
+  
+  n_days     <- length(date_list); print(n_days)
+  n_days_yrs <- n_days_yrs + n_days
+
+  ## add band name col
+  ## to be added as new col
+  band_name  <- gsub(pattern = '.csv', replacement = '',
+                    x = gsub(pattern = paste0(path_data, '/'),
+                             replacement = '', x = csv)); print(band_name)
+  csv_df1    <- cbind(band = band_name, csv_df)
+  
+  ## rename cols with date
+  names(csv_df1)[3:(3+length(date_list)-1)] <- as.character(date_list)
+  ## select cols of interest
+  csv_df2 <- csv_df1 %>%
+    dplyr::rename_all(tolower)  %>%
+    dplyr::select(band, date_list,
+                  matches('dateutc|station|latitude|longitude|oxmgl|depth', ignore.case = T)) %>%
+    dplyr::select(band, date_list,
+           'dateutc', 'station', 'latitude','longitude','oxmgl', everything()) %>%
+    setNames(c('band', date_list,
+               'dateutc', 'station', 'latitude','longitude','oxmgl','depth')) %>%
+    gather(key = date_rs, value = rs, ... = 2:(2+length(date_list)-1))
+
+  ## row bind
+  data <- rbind(data, csv_df2)
+}
+```
+
+## - test
+```{r eval=FALSE, include=FALSE}
+
+csv <- "./Img2Table/Img2Table_04_20191115/2016_terr_chlor_a.csv"
+
+yr <- as.numeric(substr(csv, 35, 38)); print(yr)
+date_list <- seq(from = as.Date(paste0(yr, '-02-01')),
+                 to   = as.Date(paste0(yr, '-09-30')), by = 1) %>% as.character()
+n_days <- length(date_list); print(n_days)
+n_days_yrs <- n_days_yrs + n_days
+
+## to be added as new col
+band_name <- gsub(pattern = '.csv', replacement = '',
+                  x = gsub(pattern = paste0(path_data, '/'),
+                           replacement = '', x = csv))
+print(band_name)
+  
+  
+## read in csv
+csv_df    <- read.csv(file = csv, header = T, stringsAsFactors = F); names(csv_df)
+csv_dates <- csv_df %>% dplyr::select(matches(paste0('X', yr), ignore.case = T)); names(csv_dates)
+date_list <- names(csv_dates) %>% gsub('X', '', .) %>% gsub('\\.', '-', .); date_list
+
+
+## add band name col
+csv_df1 <- cbind(band = band_name, csv_df) ; names(csv_df1)
+## rename cols with date
+names(csv_df1)[3:(3+length(date_list)-1)] <- as.character(date_list); names(csv_df1)
+## select cols of interest
+csv_df2 <- csv_df1 %>% 
+  dplyr::rename_all(tolower)  %>% 
+  dplyr::select(band, date_list, 
+                matches('dateutc|station|latitude|longitude|oxmgl|depth', ignore.case = T))# %>%
+  dplyr::select(band, date_list, 
+         'dateutc', 'station', 'latitude','longitude','oxmgl', everything()) %>%
+  setNames(c('band', date_list,
+             'dateutc', 'station', 'latitude','longitude','oxmgl','depth')) %>%
+  gather(key = date_rs, value = rs, ... = 2:(2+length(date_list)-1))
+  
+names(csv_df1)
+```
+
+
+```{r}
+## check the number of data record
+length(data$band) ## 27510
+days_ls <- as.vector(date_df$n_d);       days_ls
+st_n_yrs<- st_n_yrs %>% filter(year>=2010) 
+st_ls <- as.vector(st_n_yrs$count_st); st_ls
+st_ls*14*days_ls
+
+## check data number
+sum(st_ls*14*days_ls)
+nrow(data)
+head(data)
+
+names(data)
+unique(data$dateutc)
+
+## check data
+## 2018, 133 stations
+d <- data %>%
+  filter(date_rs > as.Date('2018-01-01'))
+head(d)
+
+unique(d$station); 
+length(unique(d$station)) ## 133 in 2018
+unique(d$band)
+length(unique(d$band))    ## 14
+length(unique(d$date_rs)) ## 242 in 2018 
+
+133*14*242
+nrow(d)
+
+```
+
+
+
+## Data cleaning
+```{r}
+### change all "No data" as NA
+###
+data2 <- data  %>% 
+  mutate_all(~na_if(., 'No data')) %>%
+  mutate(DateUTC = gsub("-", "", ## "[^0-9A-Za-z///' ]" ## remove Special characters
+                        dateutc, ignore.case = TRUE), 
+         date_st = case_when(nchar(DateUTC) >= 11 ~ as.Date(ms_to_date(DateUTC, timezone="UTC")),
+                             nchar(DateUTC) <  11 ~ as.Date(DateUTC, "%d%b%Y"),
+                             nchar(DateUTC) <= 7  ~ as.Date(DateUTC, "%d%b%y"))) %>%
+  as.data.frame()
+
+head(data2)
+str(data2)
+data.na <- data2 %>% filter(is.na(date_st))
+head(data.na)
+```
+
+
+# Time window (1w) for 2015
+```{r}
+year       <- 2015
+date_start <- as.Date(paste0(year, '-01-01')); date_start
+date_end   <- as.Date(paste0(year, '-12-31')); date_end
+                 
+data15 <- data2 %>%
+  filter(date_st <= date_end & date_rs >= date_start) 
+
+# ## test code
+# i <- 1 ## time window, start from i weeks before sampling date
+# data15_1w <- data15 %>% 
+#   mutate(rs = as.numeric(rs))  %>%
+#   filter(date_rs <= (date_st - 7*(i-1)) & date_rs > (date_st - 7*i)) %>%
+#   mutate(t.window = paste0('1w_', i)) %>%
+#   select(-dateutc, -DateUTC) %>%
+#   group_by(station,latitude,longitude,oxmgl,depth, ## only keep station is ok
+#            band, t.window) %>%
+#   summarise(Rrs_mean = mean(rs, na.rm = TRUE)) %>% as.data.frame()
+
+
+
+## loop for each time window
+## create a week list
+week_ls <- seq(1,8,1); week_ls
+data15_1w_windows <- data.frame()
+for (i in week_ls) {
+  print(i)
+  data15_1w <- data15 %>% 
+    mutate(rs = as.numeric(rs))  %>%
+    filter(date_rs <= (date_st - 7*(i-1)) & date_rs > (date_st - 7*i)) %>%
+    mutate(t.window = paste0('1w_', i)) %>%
+    select(-dateutc, -DateUTC) %>%
+    group_by(station,latitude,longitude,oxmgl,depth, ## only keep station is ok
+             band, t.window) %>%
+    summarise(Rrs_mean = mean(rs, na.rm = TRUE)) %>% as.data.frame()
+  ## row bind all
+  data15_1w_windows <- rbind(data15_1w_windows, data15_1w)
+}
+
+## wide format
+data15_1w_windows_wide <- data15_1w_windows %>%
+  spread(key = band, value = Rrs_mean)
+
+## Saving as RData 
+getwd()
+fname <- paste0('./Img2Table/data_', year, '_', sensor, '_by1w_long.RData'); fname
+save(data15_1w_windows,     file = fname)
+fname <- paste0('./Img2Table/data_', year, '_', sensor, '_by1w_wide.RData'); fname
+save(data15_1w_windows_wide,file = fname )
+
+
+
+ggplot(data = data15_1w_windows,
+       aes(x=t.window, y=(Rrs_mean))) + 
+  geom_boxplot() + 
+  facet_wrap(~band, scales = 'free_y') +
+  theme_bw() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+getwd()
+pname <- paste0('./Img2Table/Figures/', 'boxplot_', year, '_', sensor, '_by1w.png')
+pname
+ggsave(filename = pname, plot = last_plot(), width = 14, height = 10, dpi = 200)
+
+```

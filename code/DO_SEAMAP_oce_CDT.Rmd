@@ -1,0 +1,149 @@
+---
+editor_options:
+  chunk_output_type: console
+output:
+  pdf_document: default
+  html_document: default
+---
+
+
+
+
+
+```{r}
+require(oce) ## for reading, processing and plotting oceanographic data.
+require(ocedata)
+### Ref: https://semba-blog.netlify.com/10/04/2018/processing-ctd-data-with-oce-package-in-r/
+
+### set work dir
+path <- rstudioapi::getSourceEditorContext()$path
+dir  <- dirname(rstudioapi::getSourceEditorContext()$path); dir
+setwd(dir)
+getwd()
+today <- format(Sys.time(), "%Y%m%d"); print(today)
+
+library(tidyverse)
+library(rlist)
+library(lubridate)
+```
+
+
+
+
+#  Data read in
+## SEAMAP 1987-2017
+```{r}
+dir.ctd <- './DO_SEAMAP/NOAA_NCEI_CTD'
+setwd(dir.ctd); getwd()
+list.dirs(path = './', full.names = T, recursive = T) 
+list.files(path = './', pattern = '*.gz', full.names = T)
+
+f <- "./0172423.1.1.tar.gz"
+
+# library(R.utils)
+# gunzip(filename = f, remove=FALSE) ## can not get folder but still zip (.tar)
+
+untar(tarfile = f, list=TRUE)  ## check contents
+untar(tarfile = f, exdir = './unzip')
+
+getwd()
+list.dirs(path = './', full.names = T, recursive = T) 
+list.files(path = './', pattern = '*_data.csv', full.names = T, recursive = T)
+
+df2011_17 <- ".//unzip/0172423/1.1/data/1-data/MARMAPSEAMAPReefFishCTD2011-2017_data.csv"
+dt2011_17 <- read.csv(file = df2011_17, stringsAsFactors = F)
+names(dt2011_17)
+
+do <- dt2011_17 %>%
+  filter(!is.na(Oxygen))
+
+num <- do %>% filter(Year == 2015)
+
+unique(num$Latitude)
+length(unique(num$Latitude)) # 2015: 69
+  
+  
+```
+
+
+
+
+
+
+## SEAMAP 2009-2015
+```{r}
+f <- "./0131259.1.1.tar.gz"
+untar(tarfile = f, list=TRUE)  ## check contents
+untar(tarfile = f, exdir = './unzip')
+
+list.dirs(path = './', recursive = T)
+f.dir <- grep(pattern = '2015-Cruise313', 
+              x = list.dirs(path = './', recursive = T), value = T)
+f.dir
+f.list <- list.files(path = f.dir, pattern = '*.cnv', recursive = T, full.names = T)
+f.list ## 243 files
+f.name <- f.list[1]; f.name
+#read profile of station1
+stn1 <- read.ctd(file = f.name)
+
+str(stn1, 2)
+
+stn1@data%>%as.data.frame()%>%dplyr::glimpse()
+
+#plot
+stn1%>%plot()
+
+
+par(mfrow = c(1,2))
+stn1%>%plot(which = "salinity")
+stn1%>%plot(which = "temperature")
+```
+
+
+  I removed the upcast CTD profiling with the ctdTrim() function and retained the downcast profiles. Once the upcast was dropped, I removed the artifacts introduced by towing rate. This was done by aligning the CTD measurements into the standard depth of 20 cm from the surface to the maximum depth of the cast with ctdDecimate() function. This produced elegant looking salinity and temperature profiles (Figure 4)
+
+```{r CTD format cleaning}
+stn1.downcast = stn1%>%
+  ctdTrim(method = "downcast")%>%
+  ctdDecimate(p = 0.2)
+
+par(mfrow = c(1,2))
+stn1.downcast%>%plot(which = c("salinity"))
+stn1.downcast%>%plot(which = c("temperature"))
+```
+
+
+```{r Plotting hydrographic section}
+dt <- stn1@data %>% as.data.frame()
+
+stn2 <- stn1
+stn2[["longitude"]] <- stn1@metadata$longitude
+# loop through the files
+files <- f.list
+# length(files)
+files[1]
+# loop through the files
+ctd = list()
+for (i in 1:5){ ## 5 --> length(files)
+  print(i)
+  ctd[[i]] = read.ctd(files[i])%>%
+    ctdTrim(method = "downcast")%>%
+    ctdDecimate(p = 0.2)
+  ctd[[i]][["longitude"]] = ctd[[i]]@metadata$longitude
+  ctd[[i]][["latitude"]]  = ctd[[i]]@metadata$latitude
+  ctd[[i]][["stations"]]  = ctd[[i]]@metadata$station
+}
+
+
+
+```
+
+
+
+
+
+
+
+
+
+

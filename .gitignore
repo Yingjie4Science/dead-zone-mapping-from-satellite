@@ -40,3 +40,11 @@ vignettes/*.pdf
 
 # Ignoring directories in Git repositories on Windows
 data/
+code/_code_log/
+code/_RF_to_learn/
+draft/
+results/
+ref_hypoxia/
+meeting_notes/
+
+

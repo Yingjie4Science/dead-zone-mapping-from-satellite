@@ -1,0 +1,380 @@
+---
+title: "LUMCON.Rmd"
+author: "Yingjie"
+date: "12/6/2019"
+output: html_document
+editor_options: 
+  chunk_output_type: console
+---
+
+
+
+#  Dirs and Packages
+```{r message=FALSE, warning=FALSE}
+### To clear your environment 
+remove(list = ls())
+
+### set work dir
+path <- rstudioapi::getSourceEditorContext()$path
+dir  <- dirname(rstudioapi::getSourceEditorContext()$path); dir
+setwd(dir)
+
+dir.ctd <- './DO_LUMCON/Rabalais_zip'
+setwd(dir.ctd); getwd()
+
+today <- format(Sys.time(), "%Y%m%d"); print(today)
+
+library(tidyverse)
+library(dplyr)
+library(rlist)
+library(lubridate)
+library(cowplot)
+```
+
+
+
+#  Data read in
+  NCEI Accession_LUMCON SeaBird
+## unzip all  
+
+```{r}
+getwd()
+list.dirs(path = './', full.names = T, recursive = T) 
+list.files(path = './', pattern = '*.gz', full.names = T)
+
+ls.gz <- list.files(path = './', pattern = '*.gz', full.names = T)
+
+for (f in ls.gz) {
+  print(f)
+  ### unzip files
+  untar(tarfile = f, list=TRUE)  ## check contents
+  untar(tarfile = f, exdir = './unzip')
+}
+```
+
+
+
+## Example 
+### For 2016/2015/2014/2013/2012
+```{r}
+yr <- 2015
+
+getwd()
+# list.dirs(path = './', full.names = T, recursive = T) 
+list.files(path = './', pattern = paste0('*', yr, '.*'), full.names = T, recursive = T)
+
+st <- list.files(path = './', pattern = paste0(yr, '_StationList.csv'), full.names = T, 
+                 recursive = T, all.files = T, ignore.case = T); st
+
+sb <- list.files(path = './', pattern = paste0(yr, '_Seabird.csv'), full.names = T, 
+                 recursive = T, all.files = T, ignore.case = T); sb
+
+ys <- list.files(path = './', pattern = paste0(yr, '_YSI6820.csv'), full.names = T, 
+                 recursive = T, all.files = T, ignore.case = T); ys
+
+
+
+st0 <- read.csv(file = st, stringsAsFactors = F); 
+sb0 <- read.csv(file = sb, stringsAsFactors = F); 
+ys0 <- read.csv(file = ys, stringsAsFactors = F);
+```
+
+
+
+### For 2011 data only
+```{r}
+yr <- 2011; sep = "|"
+### FOR 2011 DATA
+st <- list.files(path = './', pattern = paste0(yr, '_StationList.csv'), full.names = T, 
+                 recursive = T, all.files = T, ignore.case = T); st
+
+sb <- list.files(path = './', pattern = paste0(yr, '_Seabird.csv'), full.names = T, 
+                 recursive = T, all.files = T, ignore.case = T); sb
+
+ys <- list.files(path = './', pattern = paste0(yr, '_YSI6820.csv'), full.names = T, 
+                 recursive = T, all.files = T, ignore.case = T); ys
+
+st0 <- read.csv(file = st, stringsAsFactors = F, sep = sep); 
+sb0 <- read.csv(file = sb, stringsAsFactors = F, sep = sep); 
+ys0 <- read.csv(file = ys, stringsAsFactors = F, sep = sep);
+```
+
+
+
+### For 2010 data only
+```{r}
+yr <- 2010
+
+st <- list.files(path = './', pattern = paste0(yr, '_StationList.txt'), full.names = T, 
+                 recursive = T, all.files = T, ignore.case = T); st
+
+sb <- list.files(path = './', pattern = paste0(yr, '_Seabird.txt'), full.names = T, 
+                 recursive = T, all.files = T, ignore.case = T); sb
+
+ys <- list.files(path = './', pattern = paste0(yr, '_YSI6820.txt'), full.names = T, 
+                 recursive = T, all.files = T, ignore.case = T); ys
+
+### for 2010 data
+library(splitstackshape)
+st0 <- read.csv(file = st, header = F, stringsAsFactors = F) %>%
+  as.data.frame() %>%
+  dplyr::filter(row_number() %% 2 == 0) %>% ## Select odd rows; 0 for even raws
+  cSplit(., splitCols = 1, sep = "\\|", fixed = FALSE, direction = 'wide', 
+         drop = T, stripWhite = T) %>%
+  select(-1) %>% ## remove 1st col
+  setNames(as.character(as.matrix(.[1,]))) %>%
+  mutate_if(is.factor, as.character) %>% slice(-1)  %>%    ## remove 1st row
+  mutate_all(na_if,"")
+
+# as.vector(st0[1,])    ## not work
+# as.character(st0[1,]) ## not work
+# as.character(as.matrix(st0[1,]))
+# colnames(st0) <- as.character(as.matrix(st0[1,]))
+
+sb0 <- read.csv(file = sb, header = F, stringsAsFactors = F)  %>% as.data.frame() %>%
+  dplyr::filter(row_number() %% 2 == 0) %>% ## Select odd rows; 0 for even raws
+  cSplit(., splitCols = 1, sep = "\\|", fixed = FALSE, direction = 'wide', 
+         drop = T, stripWhite = T) %>%
+  select(-1) %>% ## remove 1st col
+  mutate_if(is.factor, as.character) %>%
+  setNames(as.character(as.matrix(.[1,]))) %>%   slice(-1)      ## remove 1st row
+
+ys0 <- read.csv(file = ys, header = F, stringsAsFactors = F)  %>% as.data.frame() %>%
+  dplyr::filter(row_number() %% 2 == 0) %>% ## Select odd rows; 0 for even raws
+  cSplit(., splitCols = 1, sep = "\\|", fixed = FALSE, direction = 'wide', 
+         drop = T, stripWhite = T) %>%
+  select(-1) %>% ## remove 1st col
+  mutate_if(is.factor, as.character) %>%
+  setNames(as.character(as.matrix(.[1,]))) %>%   slice(-1)      ## remove 1st row
+```
+
+
+## Pre-processing
+```{r}
+names(st0)
+names(sb0)
+names(ys0)
+
+str(st0)
+
+### Error IN StationList: CSI-9 (station name) should be CSI9
+st1 <- st0 %>% 
+  dplyr::rename_all(tolower) %>%
+  distinct(stationid, .keep_all = T) %>% arrange(station) %>%
+  # select(matches('station|date|latitude|longitude', ignore.case = T)) %>%
+  select(grep('station|lat|lon', names(.), ignore.case = T)) %>% ## latitude|longitude
+  as.data.frame() %>%
+  mutate(station = if_else(station == 'CSI-9', 'CSI9', station)) %>%
+  drop_na(ncol(.))
+
+
+sb1 <- sb0 %>% as.data.frame() %>% dplyr::rename_all(tolower) %>% arrange(station) %>%
+  select(grep('station|date|depth|temp|salinity|conductivity|oxygen', names(.), 
+              ignore.case = T)) %>%
+  # select(!grep('id', names(.), ignore.case = T))
+  select(-c("station")) %>%
+  select(-ncol(.)) ## remove the last col - (oxygen %)
+
+ys1 <- ys0 %>% as.data.frame() %>% dplyr::rename_all(tolower) %>% arrange(station) %>%
+  select(grep('station|date|depth|temp|salinity|chl|DO', names(.), 
+              ignore.case = T)) %>%
+  select(-c("station")) %>%
+  select(-grep('do\\..\\..', names(.), ignore.case = T)) ## remove (oxygen %)
+
+length(unique(st1$stationid))
+length(unique(sb1[,1]))
+length(unique(ys1[,1]))
+names(st1)
+names(sb1)
+names(ys1)
+
+st.name1 <- gsub(pattern = '(\\..*)| .*', replacement = '', x = names(st1)); st.name1
+sb.name1 <- gsub(pattern = '(\\..*)| .*', replacement = '', x = names(sb1)); sb.name1
+ys.name1 <- gsub(pattern = '(\\..*)| .*', replacement = '', x = names(ys1)); ys.name1
+names(st1) <- st.name1
+names(sb1) <- sb.name1
+names(ys1) <- ys.name1
+
+names(st1)
+names(sb1)
+names(ys1)
+
+st1 <- st1 %>% 
+  setNames(., replace(names(.), names(.) == 'lat', 'latitude')) %>%
+  setNames(., replace(names(.), names(.) == 'lon', 'longitude'))
+sb1 <- sb1 %>% 
+  setNames(., replace(names(.), names(.) == 'station', 'stationid'))
+ys1 <- ys1 %>% 
+  setNames(., replace(names(.), names(.) == 'station', 'stationid')) %>%
+  setNames(., replace(names(.), names(.) == 'odo', 'do')) %>%
+  setNames(make.unique(names(.))) %>%
+  select(-grep('do.1|odosat', names(.), ignore.case = T))
+
+
+### merge data
+sb2 <- merge(x = sb1, y = st1, by.x = 'stationid', by.y = 'stationid', all.x = T) %>%
+  as.data.frame() %>%
+  dplyr::mutate(
+    # date = as.Date(date, "%m/%d/%Y"),
+    
+    # date = case_when(grepl(pattern = '[\\/]', x = date) ~ as.Date(date, "%m/%d/%y"),
+    #                  grepl(pattern = '[\\-]', x = date) ~ as.Date(date, "%m-%d-%y")),
+    
+    date = gsub(pattern = '[\\-]', replacement = '/', x = date), 
+    date = case_when(nchar(date) >=  8  ~ as.Date(date, "%m/%d/%Y"),
+                     nchar(date) < 8  ~ as.Date(date, "%m/%d/%y")),
+    station = as.factor(station)) %>%
+  arrange(station, depth, date)
+
+
+ys2 <- merge(x = ys1, y = st1, by.x = 'stationid', by.y = 'stationid', all.x = T) %>%
+  as.data.frame() %>%
+  dplyr::mutate(
+    date = gsub(pattern = '[\\-]', replacement = '/', x = date), 
+    date = case_when(nchar(date) >=  8  ~ as.Date(date, "%m/%d/%Y"),
+                     nchar(date) < 8  ~ as.Date(date, "%m/%d/%y")),
+    station = as.factor(stationid)) %>%
+  arrange(station, depth, date)
+
+  
+### check data
+# sb2.na <- sb2 %>% filter(is.na(latitude)) ## some data using "lat" not "latitude"
+sb2.na <- sb2 %>% filter(is.na(latitude))  
+### NA because no such station info in StationList
+ys2.na <- ys2 %>% filter(is.na(latitude))
+
+### check na in each col
+apply(sb2, 2, function(x) any(is.na(x)))
+apply(ys2, 2, function(x) any(is.na(x)))
+
+### if no errors, filter out the NA raws
+sb2 <- sb2 %>% filter(!is.na(.[,ncol(.)])) ## latitude or lat or this 
+ys2 <- ys2 %>% filter(!is.na(.[,ncol(.)]))
+
+
+length(unique(sb2$station))
+# length(unique(sb2$stationid))
+length(unique(ys2$station))
+# length(unique(ys2$stationid))
+```
+
+
+```{r Data description}
+hist(sb2$oxygen)
+hist(ys2$do)
+
+### sampling at what time, and how many samples
+sb2 %>% ggplot() +  ## July 25 ~ Aug 5
+  geom_bar(aes(x = date)) + 
+  scale_x_date(date_breaks = "1 day", date_labels =  "%m-%d") + ## %Y-%m-%d
+  theme_bw() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+ys2 %>% filter(month(date) > 6 & month(date) < 9) %>%
+  ggplot() +
+  geom_bar(aes(x = date)) + 
+  scale_x_date(date_breaks = "1 day", date_labels =  "%m-%d") +
+  theme_bw() +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1))
+
+
+ggplot(data = sb2) +
+  geom_point(aes(x = date, y = oxygen, color = depth)) +
+  # facet_wrap(~year,
+  #            # scales = 'free_y',
+  #            ncol = 3)+
+  scale_x_date(date_breaks = "1 day", date_labels =  "%m-%d") +
+  # facet_wrap(~station)+
+  theme_bw() +
+  geom_hline(yintercept=2, linetype="dashed", color = "red")+
+  theme(axis.text.x = element_text(angle = 45, hjust = 1),
+        panel.grid.major.x = element_line(colour="gray60", size = 0.3)) +
+  # theme(legend.position="none") + 
+  xlab('Date') + ylab('DO mg/l')
+
+
+ggplot(data = sb2) +
+  geom_point(aes(x = date, y = oxygen, color = oxygen)) +
+  # facet_wrap(~year,
+  #            # scales = 'free_y',
+  #            ncol = 3)+
+  scale_x_date(date_breaks = "1 day", date_labels =  "%m-%d") +
+  facet_wrap(~station)+
+  theme_bw() +
+  geom_hline(yintercept=2, linetype="dashed", color = "red")+
+  theme(axis.text.x = element_text(angle = 45, hjust = 1),
+        panel.grid.major.x = element_line(colour="gray60", size = 0.3)) +
+  theme(legend.position="none") + xlab('Date') + ylab('DO mg/l')
+
+
+getwd()
+# fname <- paste0('./process/Samping DO by date across station', '.png'); fname
+# ggsave(filename = fname, plot = last_plot(), dpi = 300, width = 14, height = 14)
+
+```
+
+
+### min DO at one location
+```{r}
+sb3 <- sb2 %>% as.data.frame() %>%
+    dplyr::group_by(stationid, date) %>%
+    dplyr::mutate_if(is.character,as.numeric) %>%
+    dplyr::filter(oxygen==min(oxygen))
+str(sb3)
+hist(sb3$oxygen)
+
+
+ys3 <- ys2 %>% 
+  group_by(stationid, date) %>%
+  mutate_if(is.character,as.numeric) %>%
+  filter(do==min(do))
+hist(ys3$do)
+
+getwd()
+
+### one digit for the y lables
+Func_digits <- function(x) sprintf("%.1f", x)
+
+ggplot() + 
+  # geom_polygon(data = shp, aes(x=long, y = lat, group = group), fill = 'gray90') + 
+  geom_point(data = sb3,  # use geom_point, instead of geom_sf
+             aes(x = longitude, y = latitude, color = oxygen), alpha = 1) + 
+  scale_y_continuous(labels = Func_digits, limits = c(28.1, 30.5)) +
+  xlim(-94.6, -88) +
+  scale_color_viridis_c(option = 'A', alpha = 1, name = 'do')+ ## A, B, C, D, E
+  # scale_color_distiller("DO mg/l", palette = "RdYlBu")  + # Spectral, RdYlBu, RdGy
+  theme_bw()
+ggsave(filename = paste0('./process/map_sb_do_', yr, '.png'), 
+       plot = last_plot(), dpi = 300, width = 7, height = 4)
+#
+ggplot() + 
+  # geom_polygon(data = shp, aes(x=long, y = lat, group = group), fill = 'gray90') + 
+  geom_point(data = ys3,  # use geom_point, instead of geom_sf
+             aes(x = longitude, y = latitude, color = do), alpha = 1) + 
+  scale_y_continuous(labels = Func_digits, limits = c(28.1, 30.5)) +
+  xlim(-94.6, -88) +
+  scale_color_viridis_c(option = 'A', alpha = 1, name = 'do')+ ## A, B, C, D, E
+  # scale_color_distiller("DO mg/l", palette = "RdYlBu")  + # Spectral, RdYlBu, RdGy
+  theme_bw()
+ggsave(filename = paste0('./process/map_ys_do_', yr, '.png'), 
+       plot = last_plot(), dpi = 300, width = 7, height = 4)
+
+
+### plot both in one map
+ggplot() + 
+  # geom_polygon(data = shp, aes(x=long, y = lat, group = group), fill = 'gray90') + 
+  geom_point(data = sb3,  # use geom_point, instead of geom_sf
+             aes(x = longitude, y = latitude, color = oxygen), alpha = 1) + 
+  scale_color_viridis_c(option = 'A', alpha = 0.6, name = 'do')+ ## A, B, C, D, E
+  # scale_color_distiller("DO mg/l", palette = "RdYlBu")  + # Spectral, RdYlBu, RdGy
+  
+  geom_point(data = ys3,  # use geom_point, instead of geom_sf
+             aes(x = longitude+0.05, y = latitude, color = do), alpha = 1) + 
+  # scale_color_distiller("DO mg/l", palette = "RdYlBu")  + # Spectral, RdYlBu, RdGy
+  scale_y_continuous(labels = Func_digits, limits = c(28.1, 30.5)) +
+  xlim(-94.6, -88) +
+  theme_bw()
+ggsave(filename = paste0('./process/map_2_do_', yr, '.png'), 
+       plot = last_plot(), dpi = 300, width = 7, height = 4)
+```
+

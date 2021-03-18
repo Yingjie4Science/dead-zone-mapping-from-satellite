@@ -1,14 +1,15 @@
 # set work dir
 path <- rstudioapi::getSourceEditorContext()$path
 dir  <- dirname(rstudioapi::getSourceEditorContext()$path); dir
-setwd(dir)
+setwd(dirname(dir)) ## set this parent dir as root dir
 getwd()
-dir.user <- './Img2Table/processing'
-dir.rs   <- './Img2Table/Img2Table_04_20191115' ## remote sensing data 
-dir.st   <- './hypoxia_watch_GOM_csv_copy'      ## station info
+dir.user <- './data/GEE_dead_zone_inspect_bands/processing'
+dir.rs   <- './data/GEE_dead_zone_inspect_bands/Img2Table_04_20191115' ## remote sensing data 
+dir.st   <- './data/hypoxia_watch_GOM_csv_copy'      ## station info
 library(tidyverse)
+
 #list all csv files in data folder
-csv_files <- list.files(dir.rs, pattern='*.csv')
+csv_files <- list.files(dir.rs, pattern='*.csv'); csv_files
 
 #extract year from filenames
 years <- as.numeric(substr(csv_files, 1, 4))
@@ -106,10 +107,12 @@ for (yr in years){
   }
 }
 
+
+
 ###---Both Sensors
 for (yr in years){
   print(yr)
-  stations_yr <- read.csv(paste0('./Data/hypoxia_watch_GOM_csv/', stations[grep(yr, stations)]), stringsAsFactors = FALSE)
+  stations_yr <- read.csv(paste0('./data/hypoxia_watch_GOM_csv/', stations[grep(yr, stations)]), stringsAsFactors = FALSE)
   colnames(stations_yr) <- toupper(colnames(stations_yr))
   colnames(stations_yr)[grep('DATE', colnames(stations_yr))] <- 'DATEUTC'
   count_pr = 1

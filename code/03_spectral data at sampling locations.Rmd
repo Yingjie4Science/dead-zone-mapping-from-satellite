@@ -1,0 +1,284 @@
+---
+output: html_document
+editor_options: 
+  chunk_output_type: console
+---
+
+
+# Dirs and Packages
+```{r}
+# To clear your environment 
+remove(list = ls())
+
+library(readxl)
+library(XLConnect)
+library(xlsx)
+library(tidyverse)
+library(dplyr)
+library(proj4)
+library(stringr)
+library(scales)
+library(lubridate)
+
+## data describe 
+library(summarytools)
+
+library(sf)
+library(maps)
+library(mapdata)
+
+library(RColorBrewer)
+library(viridis)
+# devtools::install_github("jaredhuling/jcolors")
+library(jcolors)
+
+
+### Set work dir ----------------------------------------------------------
+path <- rstudioapi::getSourceEditorContext()$path
+dir  <- dirname(rstudioapi::getSourceEditorContext()$path); dir
+dirname(dir)        ## go to parent dir
+setwd(dirname(dir)) ## set this parent dir as root dir
+getwd()
+
+### the data fir 
+dir.band    <- './data/GEE_dead_zone_inspect_bands/'
+dir.fig     <- paste0(dirname(dir), '/figures/'); dir.fig
+dir.cleaned <- paste0(dir.band, 'data_cleaned/'); dir.cleaned
+
+
+## keep more decimals 
+options(digits = 15)
+options(pillar.sigfig = 15)
+
+### Disable Scientific Notation in R
+options(scipen = 999) # Modify global options in R
+
+# today <- format(Sys.time(), "%Y%m%d"); print(today)
+```
+
+
+
+# Data
+## Clean data
+```{r read test}
+### test read ---------------------------------------
+file <- paste0(dir.band, 'Img2Table_04_2021-02-27/2014_aqua_chlor_a.csv')
+
+yr <- as.numeric(substr(basename(file), 1, 4)); yr
+sensor <- substr(basename(file), 6, 9); sensor
+band <- str_sub(basename(file), start = 11); band
+band <- gsub('.csv', '', band); band
+
+d1 <- read_csv(file = file)
+names(d1)
+d2 <- d1 %>%
+  dplyr::mutate(band = band) %>%
+  dplyr::select(YEID, featureID, band, `2014-03-01`:`2014-09-30`)
+d3 <- d2 %>%
+  gather(key = 'date_img', value = 'rs', `2014-03-01`:`2014-09-30`) %>%
+  dplyr::mutate(rs = as.numeric(rs)) 
+
+# names(d2) <- c('YEID', 'featureID', 'date_img', band)
+```
+
+
+```{r read loop}
+### loop-aqua -------------------------------------------------------------------------------------------
+files <- list.files(path = paste0(dir.band, 'Img2Table_04_2021-02-27/'), pattern = 'aqua', full.names = T); files
+print(paste0('Number of files: ', length(files)))
+
+ds <- data.frame()
+
+for (file in files) {
+  yr <- as.numeric(substr(basename(file), 1, 4)); yr
+  sensor <- substr(basename(file), 6, 9); sensor
+  band <- str_sub(basename(file), start = 11); band
+  band <- gsub('.csv', '', band); band
+  
+  d1 <- read_csv(file = file)
+  names(d1)
+  d2 <- d1 %>%
+    dplyr::mutate(band = band) %>%
+    dplyr::select(YEID, featureID, band, `2014-03-01`:`2014-09-30`)
+  d3 <- d2 %>%
+    gather(key = 'date_img', value = 'rs', `2014-03-01`:`2014-09-30`) %>%
+    dplyr::mutate(rs = as.numeric(rs)) 
+  ds <- rbind(ds, d3)
+}
+
+# dfSummary(ds)
+ds_aqua <- ds
+
+
+
+
+
+### loop-terr ----------------------------------------------------------------------------------------
+files <- list.files(path = paste0(dir.band, 'Img2Table_04_2021-02-27/'), pattern = 'terr', full.names = T); files
+print(paste0('Number of files: ', length(files)))
+
+ds <- data.frame()
+
+for (file in files) {
+  yr <- as.numeric(substr(basename(file), 1, 4)); yr
+  sensor <- substr(basename(file), 6, 9); sensor
+  band <- str_sub(basename(file), start = 11); band
+  band <- gsub('.csv', '', band); band
+  
+  d1 <- read_csv(file = file)
+  names(d1)
+  d2 <- d1 %>%
+    dplyr::mutate(band = band) %>%
+    dplyr::select(YEID, featureID, band, `2014-03-01`:`2014-09-30`)
+  d3 <- d2 %>%
+    gather(key = 'date_img', value = 'rs', `2014-03-01`:`2014-09-30`) %>%
+    dplyr::mutate(rs = as.numeric(rs)) 
+  ds <- rbind(ds, d3)
+}
+
+# dfSummary(ds)
+ds_terr <- ds
+names(ds)
+```
+
+
+
+
+```{r merge 2 sensors}
+### merge the 2 sensors ---------------------------------------------------------------------------------
+ds_2sensor <- merge(x = ds_aqua, y = ds_terr, by = c("YEID", "featureID", "band", "date_img")) 
+names(ds_2sensor) <- c( "YEID", "featureID", "band", "date_img", "aqua", "terr")
+
+
+### check the variation of two data source
+ds_2sensor_check <- ds_2sensor %>%
+  dplyr::mutate(dif = aqua - terr) #%>%  arrange(dif)
+
+# dfSummary(ds_2sensor_check)
+hist(ds_2sensor_check$dif)
+
+### scatter plot 
+# library(ggpmisc)
+# my.formula <- y ~ x
+# ggplot(ds_2sensor, aes(x = aqua, y = terr)) +
+#   geom_point(alpha = 0.2) +
+#   facet_wrap(~band, scales = 'free') +
+#   geom_smooth(method = 'lm', na.rm = T, formula = my.formula) + 
+#   stat_poly_eq(formula = my.formula, 
+#                aes(label = paste(..eq.label.., ..rr.label.., sep = "~~~")), 
+#                parse = TRUE) + stat_poly_eq(formula = my.formula, 
+#                aes(label = paste(..eq.label.., ..rr.label.., sep = "~~~")), 
+#                parse = TRUE) + 
+#   theme_bw()
+# fname <- paste0(dir.fig, 'band_correlation_auqa_terr.jpg'); fname
+# ggsave(fname, last_plot(), width = 16, height = 9, dpi = 300, units = 'in')
+
+
+
+### take the average value of `aqua` and `terr` as the composite pixel value?
+### ---> ??? perhaps need to examine if this will cause problems, as I see the two differ from each other a lot at some locations.
+ds_2sensor_composite <- transform(ds_2sensor, pixel = rowMeans(ds_2sensor[,5:6], na.rm = TRUE)) %>%
+  dplyr::select(-aqua, -terr, -featureID) %>%
+  spread(key = band, value = pixel) %>%
+  as.data.frame()
+
+
+### save to local 
+dirname(dir)
+fname <- paste0(dirname(dir), '/data/data_for_sam/sample_2014_ImageBandValue_at_SamplingLocations.xlsx'); fname
+writexl::write_xlsx(x = ds_2sensor_composite, path = fname)
+```
+
+
+
+
+## Spectrum data: n-week before 
+```{r 1-week before}
+df_do <- readxl::read_excel(path = paste0('./data/data_for_sam/', 'sample_2014_DO.xlsx'))
+
+### for the DO data, to extract the unique location and the sampling date
+### - usually, there is only one date for one location 
+df_sample_info <- df_do %>%
+  dplyr::distinct(YEID, Date, .keep_all = F)
+
+### use the sampling location and date info to composite the "n-week before" spectrum data for each location
+df_merge <- merge(x = ds_2sensor_composite, y = df_sample_info, by = 'YEID', all.x = T) %>%
+  dplyr::mutate(Date = as.Date(Date), date_img = as.Date(date_img)) %>%
+  dplyr::select(YEID, Date, date_img, everything())
+# str(df_merge)
+
+
+
+### '1-week before' image. Range: [t0 - 7*1+1] ~ [t0 - 7*(1-1)]   ----------------------------------------------
+nw <- 1
+df_merge_1w <- df_merge %>%
+  # dplyr::filter(YEID == '2014_003') %>% ## this line is for testing only
+  dplyr::filter(date_img >= (Date - 7*nw + 1),
+                date_img <= (Date - 7*(nw - 1))) %>%
+  dplyr::mutate(n_day_ago = Date - date_img,
+                n_day_ago = as.numeric(n_day_ago)) %>%
+  dplyr::select(YEID, Date, date_img, n_day_ago, everything())
+# str(df_merge_1w)
+
+
+
+
+### availability in the 1-week period
+# colSums(is.na(df_merge_1w)) ### this is a way to do so
+df_merge_1w_naCount <- df_merge_1w %>%
+  dplyr::select(-Date, -date_img, -n_day_ago) %>%
+  group_by(YEID) %>%
+  summarise_all(funs(sum(!is.na(.))))
+### plot  
+# df_merge_1w_naCount %>%
+#   gather(key = 'band', value = 'count', 2:ncol(.)) %>%
+#   ggplot(aes(x = band, y = count/7*100, color = band)) + 
+#   geom_violin(trim = FALSE)+
+#   geom_jitter(position=position_jitter(0.05), alpha = 0.2, aes(fill = band)) +
+#   geom_boxplot(width=.15, color = 'black', fill = NA, size = 0.1) +
+#   facet_wrap(~band, scales = 'free') +
+#   theme_bw() +
+#   ylab('% of days in a week has data') +
+#   theme(legend.position="none")# Remove legend
+# fname <- paste0(dir.fig, 'band_percent of days in a week has data.jpg'); fname
+# ggsave(fname, last_plot(), width = 16, height = 9, dpi = 300, units = 'in')
+
+
+
+
+### composite the 1-week long image ---------------------------------------------------------------------------
+df_merge_1w_comp <- df_merge_1w %>%
+  dplyr::select(-Date, -date_img, -n_day_ago) %>%
+  group_by(YEID) %>%
+  summarise_all(list(mean), na.rm = TRUE)
+```
+
+
+
+
+```{r loop 1-8 week}
+### put the averaged spectrum data 1-week and n-week before in one table
+df_merge_nw_comps <- data.frame()
+for (nw in seq(1,8)) {
+  print(nw)
+  
+  df_merge_nw <- df_merge %>%
+    dplyr::filter(date_img >= (Date - 7*nw + 1),
+                  date_img <= (Date - 7*(nw - 1))) %>%
+    dplyr::mutate(n_day_ago = Date - date_img,
+                  n_day_ago = as.numeric(n_day_ago)) %>%
+    dplyr::select(YEID, Date, date_img, n_day_ago, everything())
+  
+  df_merge_nw_comp <- df_merge_nw %>%
+    dplyr::select(-Date, -date_img, -n_day_ago) %>%
+    group_by(YEID) %>%
+    summarise_all(list(mean), na.rm = TRUE)
+  
+  df_merge_nw_comps <- rbind(df_merge_nw_comps, 
+                             cbind(nweek_before = nw, df_merge_nw_comp))
+}
+
+
+```
+
+

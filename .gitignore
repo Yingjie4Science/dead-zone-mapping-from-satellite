@@ -39,12 +39,13 @@ vignettes/*.pdf
 .Renviron
 
 # Ignoring directories in Git repositories on Windows
+.gitignore
 data/
 code/_code_log/
 code/_RF_to_learn/
-draft/
+manuscript/
 results/
-ref_hypoxia/
+refs/
 meeting_notes/
 
 

@@ -111,7 +111,10 @@ stn1%>%plot()
 par(mfrow = c(1,2))
 stn1%>%plot(which = "salinity")
 stn1%>%plot(which = "temperature")
+stn1%>%plot(which = "oxygen")
 ```
+
+
 
 
   I removed the upcast CTD profiling with the ctdTrim() function and retained the downcast profiles. Once the upcast was dropped, I removed the artifacts introduced by towing rate. This was done by aligning the CTD measurements into the standard depth of 20 cm from the surface to the maximum depth of the cast with ctdDecimate() function. This produced elegant looking salinity and temperature profiles (Figure 4)
@@ -125,6 +128,8 @@ par(mfrow = c(1,2))
 stn1.downcast%>%plot(which = c("salinity"))
 stn1.downcast%>%plot(which = c("temperature"))
 ```
+
+
 
 
 ```{r Plotting hydrographic section}

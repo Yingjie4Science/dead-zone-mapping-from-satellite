@@ -240,6 +240,10 @@ save(ds_2sensor, ds_2sensor_composite, file = fname)
 ## Spectrum data: n-week before 
   To link with sampling location and sampling date info, and to determine Spectrum data 1-week, 2-week, ..., n-week before. 
 ```{r 1-week before - Test code}
+### load gee image band data --------------------------------------------------------------------------
+fname <- paste0(dir.cleaned, 'sample_2005-2019_ImageBandValue_at_SamplingLocations.RData'); fname
+load(fname)
+
 
 ### DO data with sampling date -------------------------------------------------------------------------
 # df_do <- readxl::read_excel(path = paste0('./data/data_for_gee/_for_sam/', 'sample_2014_DO.xlsx'))
@@ -412,4 +416,29 @@ t2df <- readxl::read_excel(t2) %>%
   distinct(YEID, .keep_all = T)
 ```
 
+
+
+
+```{r link with DO}
+
+### DO data with sampling date -------------------------------------------------------------------------
+df_do_min <- readxl::read_excel(path = paste0('./data/data_for_gee/', 'sample_2000_2019_DO_min.xlsx')) %>%
+  dplyr::mutate(Date = as.Date(Date))
+
+
+for (nw in seq(1,8)) {
+  # print(nw)
+  fname <- paste0(dir.cleaned, 'by_timelag/sample_2005to2019_ImageBandValue_at_SamplingLocations_', 
+                  nw, '_weekBefore', '.xlsx'); #print(fname)
+  f <- readxl::read_excel(fname) %>%
+    merge(x=., y=df_do_min, by = 'YEID') 
+  
+  f_check <- f %>%
+    arrange(!is.na(year), !is.na(Year))
+  
+  fname <- paste0(dir.cleaned, 'by_timelag_withDO/sample_2005to2019_pixelValue_withDOmin_', 
+                  nw, '_weekBefore', '.xlsx'); print(fname)
+  writexl::write_xlsx(x = f, path = fname)
+}
+```
 

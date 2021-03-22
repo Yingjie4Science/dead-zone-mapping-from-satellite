@@ -5,8 +5,10 @@ editor_options:
 ---
 
 
-# Dirs and Packages
-```{r}
+
+
+# Set up
+```{r Packages}
 # To clear your environment 
 remove(list = ls())
 
@@ -31,8 +33,10 @@ library(RColorBrewer)
 library(viridis)
 # devtools::install_github("jaredhuling/jcolors")
 library(jcolors)
+```
 
 
+```{r Dirs}
 ### Set work dir ----------------------------------------------------------
 path <- rstudioapi::getSourceEditorContext()$path
 dir  <- dirname(rstudioapi::getSourceEditorContext()$path); dir
@@ -51,7 +55,7 @@ dir.output <- './data_cleaned/'
 
 today <- format(Sys.time(), "%Y%m%d"); print(today)
 
-## keep more decimals 
+### keep more decimals 
 options(digits = 15)
 options(pillar.sigfig = 15)
 ```
@@ -68,7 +72,7 @@ load(fname)
 summary(df)
 dfSummary(df)
 
-
+### data with DO info ------------------------------------------------------------
 df <- df %>%
   dplyr::mutate(Source = as.character(Source),
                 DO_na = ifelse(DO < 0, NA, DO)) %>%
@@ -84,14 +88,12 @@ df <- df %>%
   dplyr::select(-DO_na)
 
 
-
+### data for sampling locations only ----------------------------------------------
 sp <- sp %>%
   dplyr::mutate(Source = as.character(Source))
 
-
 length(unique(df$YEID))  ## 8827 --> 7779
 length(unique(sp$YEID))  ## 7879 --> 8117
-
 ```
 
 
@@ -115,7 +117,6 @@ sp %>%
   dplyr::filter(Year < 2000) %>%
   distinct(YEID, .keep_all = T) %>%
   nrow()
-
 
 ## change levels of the data sources
 levels(df$Source)
@@ -267,7 +268,7 @@ print(paste0('There are ', nrow(df_after2000), ' sample data during 2000 and ', 
 
 
 ##  Add SEAMAP data
-  To add additional samples from NOAA_NCEI_Hypoxia Watch
+  To add additional samples from NOAA_NCEI_Hypoxia Watch to `df`.
 ```{r}
 xlsx <- list.files(path = dir.root, pattern = 'hypoxia_watch_GOM_csv_DO_Cleaned_2001_2018.xlsx', recursive = T, full.names = T); xlsx
 
@@ -359,11 +360,16 @@ save(df_final, sp_final, file = fname)
 
 
 
-
-### - input data for GEE (Nan Jia)
+#---------------------------
+# Use the cleaned data
+## - Input data for GEE
   - 1. DO profile data
   - 2. location table for extracting spectral data in GEE
 ```{r}
+### load cleaned data ------------------------------------------------------------
+fname <- paste0(dir.output, 'DO_Integrated_sf_sp_final_2000_2019.RData');   fname
+load(fname)
+
 
 ### 1. DO profile data --> 
 df_final_do <- df_final %>%
@@ -372,12 +378,17 @@ df_final_do <- df_final %>%
 
 
 ### 2. location table (NOT SURE WE SHOULD INCLUDE hypoxia watch DATA, perhaps NOT at this moment)
-df_final_pt <- sp1 %>%
+df_final_pt <- sp_final %>%
   dplyr::filter(Year >= 2000) %>%
-  dplyr::select(YEID, Date, lat, lon) %>%
+  dplyr::select(YEID, Date, Year, lat, lon) %>%
   distinct(YEID, .keep_all = T) %>%
   dplyr::mutate(Date = as.Date(Date))%>%
   dplyr::mutate(id = row.names(.))
+
+### how many sampling locations in each year?
+df_final_pt %>%
+  ungroup() %>% group_by(Year) %>% tally()
+  
 
 ### point to sf
 projcrs <- "+proj=longlat +datum=WGS84 +no_defs +ellps=WGS84 +towgs84=0,0,0"
@@ -404,11 +415,11 @@ st_write(obj = df_final_pt_sf, dsn = fname, delete_layer = TRUE, delete_dsn = T)
 
 
 
-### - (subset 2014 data for Sam)
+### - subset 2014 data for Sam
 ```{r}
 
 ### sampling data for 2014 --------------------
-df2014 <- df %>%
+df2014 <- df_final %>%
   dplyr::filter(Year == 2014) %>%
   dplyr::select(YEID, Year, Date, DO, Depth, Temp, Salin, Source, lat, lon) %>% 
   dplyr::mutate(Date = as.Date(Date))
@@ -420,7 +431,7 @@ names(df2014)
 ### sampling locations that will be used for extracting Spectral_Value from images
 df2014_pt <- df2014 %>%
   distinct(YEID, Date, lat, .keep_all = T) %>%
-  dplyr::select(YEID, Date, lat, lon) %>%
+  dplyr::select(YEID, Date, Year, lat, lon) %>%
   dplyr::mutate(id = row.names(.))
 
 projcrs <- "+proj=longlat +datum=WGS84 +no_defs +ellps=WGS84 +towgs84=0,0,0"
@@ -446,7 +457,7 @@ st_write(obj = df2014_sf, dsn = fname, delete_layer = TRUE) # overwrites
 
 
 
-### - map samples by year & by source
+## - Map samples by year & by source
 ```{r}
 ### load DO final data - `df_final`, and unique location data - `sp_final`
 fname <- paste0(dir.output, 'DO_Integrated_sf_sp_final_2000_2019.RData');   fname
@@ -536,7 +547,7 @@ pname <- paste0(dir.fig, 'map_samp_by source2', '.png'); pname
 
 
 
-### - DO at multiple depth
+## - DO at multiple depth
 
   do_min:       minimum DO at 3-80m depth across the profile 
   do_depth_max: DO at the max depth (3-80m) across the profile
@@ -622,7 +633,7 @@ do_80m %>%
 
 
 
-#### do_min data
+### - do_min data
 ```{r}
 do_min %>%
   ungroup() %>%

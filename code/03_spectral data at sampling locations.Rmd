@@ -5,8 +5,12 @@ editor_options:
 ---
 
 
-# Dirs and Packages
-```{r}
+
+
+
+# Set up
+
+```{r Packages}
 # To clear your environment 
 remove(list = ls())
 
@@ -31,8 +35,10 @@ library(RColorBrewer)
 library(viridis)
 # devtools::install_github("jaredhuling/jcolors")
 library(jcolors)
+```
 
 
+```{r Dirs}
 ### Set work dir ----------------------------------------------------------
 path <- rstudioapi::getSourceEditorContext()$path
 dir  <- dirname(rstudioapi::getSourceEditorContext()$path); dir
@@ -41,9 +47,9 @@ setwd(dirname(dir)) ## set this parent dir as root dir
 getwd()
 
 ### the data fir 
-dir.band    <- './data/GEE_dead_zone_inspect_bands/'
+dir.band    <- './data/data_from_gee/'
 dir.fig     <- paste0(dirname(dir), '/figures/'); dir.fig
-dir.cleaned <- paste0(dir.band, 'data_cleaned/'); dir.cleaned
+dir.cleaned <- paste0(dir.band, 'Img2Table_cleaned/'); dir.cleaned
 
 
 ## keep more decimals 
@@ -60,9 +66,11 @@ options(scipen = 999) # Modify global options in R
 
 # Data
 ## Clean data
-```{r read test}
+
+  Test code - to read in the csv
+```{r eval=FALSE, include=FALSE}
 ### test read ---------------------------------------
-file <- paste0(dir.band, 'Img2Table_04_2021-02-27/2014_aqua_chlor_a.csv')
+file <- paste0(dir.band, 'Img2Table_04_2021-03-18/2005_aqua_chlor_a.csv')
 
 yr <- as.numeric(substr(basename(file), 1, 4)); yr
 sensor <- substr(basename(file), 6, 9); sensor
@@ -73,19 +81,23 @@ d1 <- read_csv(file = file)
 names(d1)
 d2 <- d1 %>%
   dplyr::mutate(band = band) %>%
-  dplyr::select(YEID, featureID, band, `2014-03-01`:`2014-09-30`)
+  dplyr::select(YEID, featureID, band, 2:Date) %>%
+  dplyr::select(-Date)
 d3 <- d2 %>%
-  gather(key = 'date_img', value = 'rs', `2014-03-01`:`2014-09-30`) %>%
+  gather(key = 'date_img', value = 'rs', 4:ncol(.)) %>%
   dplyr::mutate(rs = as.numeric(rs)) 
 
 # names(d2) <- c('YEID', 'featureID', 'date_img', band)
 ```
 
 
-```{r read loop}
+
+
+  loop read in csv of aqua and terr data
+```{r loop read in csv}
 ### loop-aqua -------------------------------------------------------------------------------------------
-files <- list.files(path = paste0(dir.band, 'Img2Table_04_2021-02-27/'), pattern = 'aqua', full.names = T); files
-print(paste0('Number of files: ', length(files)))
+files <- list.files(path = paste0(dir.band, 'Img2Table_04_2021-03-18/'), pattern = 'aqua', full.names = T); files
+print(paste0('Number of files: ', length(files))) ## (2019-2005+1)*14 = 210
 
 ds <- data.frame()
 
@@ -99,9 +111,10 @@ for (file in files) {
   names(d1)
   d2 <- d1 %>%
     dplyr::mutate(band = band) %>%
-    dplyr::select(YEID, featureID, band, `2014-03-01`:`2014-09-30`)
+    dplyr::select(YEID, featureID, band, 2:Date) %>%
+    dplyr::select(-Date)
   d3 <- d2 %>%
-    gather(key = 'date_img', value = 'rs', `2014-03-01`:`2014-09-30`) %>%
+    gather(key = 'date_img', value = 'rs', 4:ncol(.)) %>%
     dplyr::mutate(rs = as.numeric(rs)) 
   ds <- rbind(ds, d3)
 }
@@ -110,11 +123,24 @@ for (file in files) {
 ds_aqua <- ds
 
 
+### double-check the data - there are fewer data from Terr than Aqua
+ds_aqua_count <- ds_aqua %>%
+  dplyr::mutate(year = year(date_img)) %>%
+  group_by(year, band) %>%
+  tally() %>%
+  dplyr::mutate(n_location = n/214) ## 214 days
+ds_aqua_count %>% distinct(year, n_location)
+# ds_aqua_count_daysPerYear <- ds_aqua %>%
+#   dplyr::mutate(year = year(date_img)) %>%
+#   group_by(YEID, year, band) %>%
+#   tally()
+
+
 
 
 
 ### loop-terr ----------------------------------------------------------------------------------------
-files <- list.files(path = paste0(dir.band, 'Img2Table_04_2021-02-27/'), pattern = 'terr', full.names = T); files
+files <- list.files(path = paste0(dir.band, 'Img2Table_04_2021-03-18/'), pattern = 'terr', full.names = T); files
 print(paste0('Number of files: ', length(files)))
 
 ds <- data.frame()
@@ -129,25 +155,38 @@ for (file in files) {
   names(d1)
   d2 <- d1 %>%
     dplyr::mutate(band = band) %>%
-    dplyr::select(YEID, featureID, band, `2014-03-01`:`2014-09-30`)
+    dplyr::select(YEID, featureID, band, 2:Date) %>%
+    dplyr::select(-Date)
   d3 <- d2 %>%
-    gather(key = 'date_img', value = 'rs', `2014-03-01`:`2014-09-30`) %>%
-    dplyr::mutate(rs = as.numeric(rs)) 
+    gather(key = 'date_img', value = 'rs', 4:ncol(.)) %>%
+    dplyr::mutate(rs = as.numeric(rs))  
   ds <- rbind(ds, d3)
 }
 
 # dfSummary(ds)
 ds_terr <- ds
 names(ds)
+
+
+### double-check the data - there are fewer data from Terr than Aqua
+ds_terr_count <- ds_terr %>%
+  dplyr::mutate(year = year(date_img)) %>%
+  group_by(year, band) %>%
+  tally() %>%
+  dplyr::mutate(n_location = n/214) ## 214 days
+  
+ds_terr_count %>% distinct(year, n_location)
 ```
 
 
 
 
-```{r merge 2 sensors}
+```{r join 2 sensors}
 ### merge the 2 sensors ---------------------------------------------------------------------------------
 ds_2sensor <- merge(x = ds_aqua, y = ds_terr, by = c("YEID", "featureID", "band", "date_img")) 
+names(ds_2sensor)
 names(ds_2sensor) <- c( "YEID", "featureID", "band", "date_img", "aqua", "terr")
+head(ds_2sensor)
 
 
 ### check the variation of two data source
@@ -183,36 +222,75 @@ ds_2sensor_composite <- transform(ds_2sensor, pixel = rowMeans(ds_2sensor[,5:6],
   as.data.frame()
 
 
-### save to local 
+### save to local ---------------
 dirname(dir)
-fname <- paste0(dirname(dir), '/data/data_for_sam/sample_2014_ImageBandValue_at_SamplingLocations.xlsx'); fname
-writexl::write_xlsx(x = ds_2sensor_composite, path = fname)
+fname <- paste0(dir.cleaned, 'sample_2005-2019_ImageBandValue_at_SamplingLocations.RData'); fname
+save(ds_2sensor, ds_2sensor_composite, file = fname)
+
+
+### save as csv -----------------
+# fname <- paste0(dirname(dir), '/data/data_for_gee/_for_sam/sample_2014_ImageBandValue_at_SamplingLocations.xlsx'); fname
+# fname <- paste0(dir.cleaned, 'sample_2005-2019_ImageBandValue_at_SamplingLocations.xlsx'); fname
+# writexl::write_xlsx(x = ds_2sensor_composite, path = fname)
 ```
 
 
 
 
 ## Spectrum data: n-week before 
-```{r 1-week before}
-df_do <- readxl::read_excel(path = paste0('./data/data_for_sam/', 'sample_2014_DO.xlsx'))
+  To link with sampling location and sampling date info, and to determine Spectrum data 1-week, 2-week, ..., n-week before. 
+```{r 1-week before - Test code}
+
+### DO data with sampling date -------------------------------------------------------------------------
+# df_do <- readxl::read_excel(path = paste0('./data/data_for_gee/_for_sam/', 'sample_2014_DO.xlsx'))
+df_do <- readxl::read_excel(path = paste0('./data/data_for_gee/', 'sample_2000_2019_DO.xlsx'))
 
 ### for the DO data, to extract the unique location and the sampling date
 ### - usually, there is only one date for one location 
 df_sample_info <- df_do %>%
   dplyr::distinct(YEID, Date, .keep_all = F)
+### - how many samples in each month in each year?
+df_sample_info_monthIn <- df_sample_info %>%
+  dplyr::mutate(yy = year(Date),
+                mm = month(Date),
+                dd = day(Date),
+                time = as.Date(paste('2000', mm, dd, sep = '-'))) %>%
+  ungroup() %>%
+  group_by(yy, mm) %>%
+  tally()
 
+### - there are samples took in month of 10 and 11. to keep constancy, we remove these samples
+df_sample_info_final <- df_sample_info %>%
+  dplyr::mutate(yy = year(Date),
+                mm = month(Date))%>%
+  dplyr::filter(mm <=9) %>%
+  dplyr::select(-yy, -mm)
+
+
+
+
+### Join spectrum data and DO data by id ----------------------------------------------------------------
 ### use the sampling location and date info to composite the "n-week before" spectrum data for each location
-df_merge <- merge(x = ds_2sensor_composite, y = df_sample_info, by = 'YEID', all.x = T) %>%
+df_merge <- merge(x = ds_2sensor_composite, y = df_sample_info_final, by = 'YEID', all.x = T) %>%
   dplyr::mutate(Date = as.Date(Date), date_img = as.Date(date_img)) %>%
-  dplyr::select(YEID, Date, date_img, everything())
+  dplyr::select(YEID, Date, date_img, everything()) %>%
+  arrange(YEID, Date, date_img)
 # str(df_merge)
 
 
 
-### '1-week before' image. Range: [t0 - 7*1+1] ~ [t0 - 7*(1-1)]   ----------------------------------------------
+
+### '1-week before' image. Range: [t0 - 7*1+1] ~ [t0 - 7*(1-1)]   ---------------------------------------
 nw <- 1
 df_merge_1w <- df_merge %>%
-  # dplyr::filter(YEID == '2014_003') %>% ## this line is for testing only
+  ungroup() %>%
+  # group_by(YEID) %>%
+  dplyr::mutate(year = year(Date)) %>%
+  group_by(YEID, year) %>%
+  ### test -------------------------
+  # dplyr::filter(YEID == '2014_003') %>%
+  # dplyr::filter(year == 2008) %>% ## this line is for testing only
+  ### ------------------------------  
   dplyr::filter(date_img >= (Date - 7*nw + 1),
                 date_img <= (Date - 7*(nw - 1))) %>%
   dplyr::mutate(n_day_ago = Date - date_img,
@@ -220,19 +298,28 @@ df_merge_1w <- df_merge %>%
   dplyr::select(YEID, Date, date_img, n_day_ago, everything())
 # str(df_merge_1w)
 
+### - how many sampling locations are included for each year in the data?
+df_merge_1w %>%
+  dplyr::mutate(year = year(Date)) %>%
+  ungroup() %>%
+  group_by(year) %>%
+  tally() %>%
+  dplyr::mutate(nn = n/7)
+  
 
 
-
-### availability in the 1-week period
+### - availability in the 1-week period
 # colSums(is.na(df_merge_1w)) ### this is a way to do so
 df_merge_1w_naCount <- df_merge_1w %>%
-  dplyr::select(-Date, -date_img, -n_day_ago) %>%
+  ungroup() %>%
+  dplyr::select(-Date, -date_img, -n_day_ago, -year) %>%
   group_by(YEID) %>%
   summarise_all(funs(sum(!is.na(.))))
-### plot  
+
+### plot the data distribution
 # df_merge_1w_naCount %>%
 #   gather(key = 'band', value = 'count', 2:ncol(.)) %>%
-#   ggplot(aes(x = band, y = count/7*100, color = band)) + 
+#   ggplot(aes(x = band, y = count/7*100, color = band)) +
 #   geom_violin(trim = FALSE)+
 #   geom_jitter(position=position_jitter(0.05), alpha = 0.2, aes(fill = band)) +
 #   geom_boxplot(width=.15, color = 'black', fill = NA, size = 0.1) +
@@ -248,6 +335,7 @@ df_merge_1w_naCount <- df_merge_1w %>%
 
 ### composite the 1-week long image ---------------------------------------------------------------------------
 df_merge_1w_comp <- df_merge_1w %>%
+  ungroup() %>%
   dplyr::select(-Date, -date_img, -n_day_ago) %>%
   group_by(YEID) %>%
   summarise_all(list(mean), na.rm = TRUE)
@@ -256,13 +344,20 @@ df_merge_1w_comp <- df_merge_1w %>%
 
 
 
+  Loop 1-week, 2-week, ..., 8-week before, and 
+  - save data in each time-lagas separate xlsx file
+  - save data in each year as separate xlsx file. 
 ```{r loop 1-8 week}
-### put the averaged spectrum data 1-week and n-week before in one table
+### put the averaged spectrum data 1-week and n-week before in one table ---------------------------------------
 df_merge_nw_comps <- data.frame()
 for (nw in seq(1,8)) {
   print(nw)
   
   df_merge_nw <- df_merge %>%
+    ungroup() %>%
+    # group_by(YEID) %>%
+    dplyr::mutate(year = year(Date)) %>%
+    group_by(YEID, year) %>%
     dplyr::filter(date_img >= (Date - 7*nw + 1),
                   date_img <= (Date - 7*(nw - 1))) %>%
     dplyr::mutate(n_day_ago = Date - date_img,
@@ -270,15 +365,51 @@ for (nw in seq(1,8)) {
     dplyr::select(YEID, Date, date_img, n_day_ago, everything())
   
   df_merge_nw_comp <- df_merge_nw %>%
+    ungroup() %>%
     dplyr::select(-Date, -date_img, -n_day_ago) %>%
-    group_by(YEID) %>%
+    group_by(YEID, year) %>%
     summarise_all(list(mean), na.rm = TRUE)
   
+  ### save as xlsx --------------------------
+  fname <- paste0(dir.cleaned, 'by_timelag/sample_2005to2019_ImageBandValue_at_SamplingLocations_', 
+                  nw, '_weekBefore', '.xlsx'); print(fname)
+  writexl::write_xlsx(x = cbind(nweek_before = nw, df_merge_nw_comp), path = fname)
+  
+  ### bind to a combined large table --------
   df_merge_nw_comps <- rbind(df_merge_nw_comps, 
                              cbind(nweek_before = nw, df_merge_nw_comp))
 }
 
 
+
+
+### loop years, and save data in each year as separate xlsx file ----------------------------------------------
+for (yr in seq(2005,2019)) {
+  # print(yr)
+  df_yr <- df_merge_nw_comps %>%
+    ungroup() %>%
+    dplyr::filter(year == yr)
+  print(paste0('In ', yr, ', there are ', round(nrow(df_yr)/8, digits = 0), ' sampling locations with composite date.'))
+  
+  fname <- paste0(dir.cleaned, 'by_year/sample_', yr, '_ImageBandValue_at_SamplingLocations.xlsx'); print(fname)
+  writexl::write_xlsx(x = df_yr, path = fname)
+}
+```
+
+
+
+
+  Check the data - number of sampling locations
+```{r eval=FALSE, include=FALSE}
+t1 <- paste0(dir.cleaned, 'sample_', 2014, '_ImageBandValue_at_SamplingLocations.xlsx')
+t1df <- readxl::read_excel(t1) %>%
+  dplyr::filter(nchar(YEID) < 12) %>%
+  distinct(YEID, .keep_all = T)
+
+t2 <- paste0('./data/data_for_gee/_for_sam/', 'sample_', 2014, '_ImageBandValue_at_SamplingLocations.xlsx'); fname
+t2df <- readxl::read_excel(t2) %>%
+  dplyr::filter(nchar(YEID) < 12)%>%
+  distinct(YEID, .keep_all = T)
 ```
 
 

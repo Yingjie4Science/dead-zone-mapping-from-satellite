@@ -20,14 +20,17 @@
 ```
   data
     |__ data_for_gee
-    |   |__sample_2000_2019_DO.xlsx
+    |   |__ sample_2000_2019_DO.xlsx     *(DO data at all depth levels)*
+    |   |__ sample_2000_2019_DO_min.xlsx *(min DO at one location across the profile)*
     |
     |
     |__ data_from_gee
     |   |
-    |   |__ Img2Table_cleaned
+    |   |__ Img2Table_04_2021-03-18 *(most updated image band data downloaded from GEE)*
+    |   |
+    |   |__ Img2Table_cleaned       
     |       |
-    |       |__ by_timelag *(only pixel values)*
+    |       |__ by_timelag        *(only pixel values, extracted by considering different time lags)*
     |       |
     |       |__ by_timelag_withDO *(pixel + DO)*
     |

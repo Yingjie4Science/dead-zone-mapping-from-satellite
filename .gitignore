@@ -41,8 +41,11 @@ vignettes/*.pdf
 # Ignoring directories in Git repositories on Windows
 .gitignore
 data/
+figures/
 code/_code_log/
 code/_RF_to_learn/
+code/NanJian/
+.ipynb_checkpoints/
 manuscript/
 results/
 refs/

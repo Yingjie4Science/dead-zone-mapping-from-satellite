@@ -62,6 +62,27 @@ options(pillar.sigfig = 15)
 
 
 
+```{r Shapefile}
+library(sf)
+library(maps)
+library(mapdata)
+
+bg_transparent <- 
+  theme(
+    panel.background = element_rect(fill = "transparent"),             # bg of the panel
+    plot.background  = element_rect(fill = "transparent", color = NA), # bg of the plot
+    # panel.grid.major = element_blank(), # get rid of major grid
+    panel.grid.minor = element_blank(), # get rid of minor grid
+    legend.background = element_rect(fill = "transparent"),    # get rid of legend bg
+    # legend.box.background = element_rect(fill = "transparent"), # get rid of legend panel bg,
+    legend.box.background = element_blank()
+  )
+
+shp <- map_data('usa') ## world
+head(shp)
+```
+
+
 # Data
 ## Load cleaned data
 ```{r}
@@ -69,8 +90,8 @@ list.files(path = dir.output, pattern = 'DO_Integrated.*\\.RData', full.names = 
 fname <- "./data_cleaned/DO_Integrated_Matli_NCSU_cleaned.RData"
 load(fname)
 
-summary(df)
-dfSummary(df)
+# summary(df)
+# dfSummary(df)
 
 ### data with DO info ------------------------------------------------------------
 df <- df %>%
@@ -387,15 +408,18 @@ df_final_pt <- sp_final %>%
 
 ### how many sampling locations in each year?
 df_final_pt %>%
-  ungroup() %>% group_by(Year) %>% tally()
-  
+  ungroup() %>% dplyr::group_by(Year) %>% tally()
 
 ### point to sf
 projcrs <- "+proj=longlat +datum=WGS84 +no_defs +ellps=WGS84 +towgs84=0,0,0"
 df_final_pt_sf <- st_as_sf(df_final_pt, coords = c("lon", "lat"), crs = projcrs)
 ggplot() + geom_sf(data = df_final_pt_sf, col = "red", size = 1) + theme_bw()
+```
 
 
+
+
+```{r}
 ### write to file ---------------------------
 fname <- paste0(dirname(dir), '/data/data_for_gee/sample_2000_2019_DO.xlsx'); fname  ### xlsx can be smaller than csv file
 writexl::write_xlsx(x = df_final_do, path = fname)
@@ -417,11 +441,13 @@ st_write(obj = df_final_pt_sf, dsn = fname, delete_layer = TRUE, delete_dsn = T)
 
 ### - subset 2014 data for Sam
 ```{r}
+names(df_final)
 
 ### sampling data for 2014 --------------------
 df2014 <- df_final %>%
   dplyr::filter(Year == 2014) %>%
-  dplyr::select(YEID, Year, Date, DO, Depth, Temp, Salin, Source, lat, lon) %>% 
+  dplyr::filter(nchar(YEID) < 10) %>%
+  dplyr::select(YEID, Year, Date, DO, Depth, Temp, Salin, Source, lat, lon, Depth_dem) %>% 
   dplyr::mutate(Date = as.Date(Date))
 
 # dfSummary(df2014)
@@ -441,15 +467,75 @@ ggplot() + geom_sf() + geom_sf(data = df2014_sf, col = "red", size = 1) + theme_
 
 
 ### write to file ---------------------------
-fname <- paste0(dirname(dir), '/data/data_for_sam/sample_2014_DO.xlsx'); fname
+fname <- paste0(dirname(dir), '/data/data_for_gee/_for_sam/sample_2014_DO_plusBathymetry.xlsx'); fname
 writexl::write_xlsx(x = df2014, path = fname)
 
-fname <- paste0(dirname(dir), '/data/data_for_sam/sample_2014_locations.csv'); fname
+fname <- paste0(dirname(dir), '/data/data_for_gee/_for_sam/sample_2014_locations.csv'); fname
 # writexl::write_xlsx(x = df2014_pt, path = fname)
 write.csv(x = df2014_pt, file = fname, row.names = F)
 
-fname <- paste0(dirname(dir), '/data/data_for_sam/sample_2014_locations.shp'); fname
+fname <- paste0(dirname(dir), '/data/data_for_gee/_for_sam/sample_2014_locations.shp'); fname
 st_write(obj = df2014_sf, dsn = fname, delete_layer = TRUE) # overwrites
+
+```
+
+
+
+
+```{r data desc}
+require("ggrepel") ## for `geom_text_repel`
+
+do <- df2014
+
+## number of samples at each location
+do %>% 
+  group_by(YEID, lat, lon) %>% tally() %>%
+  dplyr::filter(nchar(YEID) < 10) %>%
+  as.data.frame() %>%
+  ggplot()+
+  # geom_violin(mapping = aes(x = 1, y = n)) + 
+  geom_histogram(aes(x = n)) +
+  theme_bw()
+
+
+## depths distribution
+do %>% 
+  dplyr::filter(nchar(YEID) < 10) %>%
+  as.data.frame() %>%
+  ggplot()+
+  # geom_violin(mapping = aes(x = 1, y = n)) + 
+  geom_histogram(aes(x = Depth)) +
+  theme_bw()
+  
+library(classInt)
+# it <- classIntervals(var = do$DO, n = 10, style = "jenks")
+# it$brks
+
+it2 <- classIntervals(var = do$DO, n = 10, style = 'quantile')
+it2$brks
+
+
+do %>%
+  ggplot()+
+  geom_point(aes(x = DO, y = -Depth, color = Temp), show.legend = F) +
+  facet_wrap(~Date) +
+  geom_vline(xintercept = 2, 'dash') +
+  theme_bw()
+
+do %>% group_by(YEID, lat, lon) %>% tally() %>%
+  dplyr::filter(nchar(YEID) < 10) %>%
+  ggplot()+
+  geom_text(aes(x = lon, y = lat, label = n, size = n), show.legend = F) +
+  theme_bw()
+
+
+# do %>% group_by(YEID, lat, lon) %>% tally() %>%
+#   ggplot()+
+#   # geom_col(aes(x = YEID, y = n)) +
+#   # geom_point(aes(x = lon, y = lat, color = n), size = 1) +
+#   geom_text(aes(x = lon, y = lat, label = n)) +
+#   # geom_text_repel(aes(x = lon, y = lat, color = n, label = n, )) +
+#   theme_bw()
 
 ```
 
@@ -463,26 +549,6 @@ st_write(obj = df2014_sf, dsn = fname, delete_layer = TRUE) # overwrites
 fname <- paste0(dir.output, 'DO_Integrated_sf_sp_final_2000_2019.RData');   fname
 load(fname)
 
-library(sf)
-library(maps)
-library(mapdata)
-
-bg_transparent <- 
-  theme(
-    panel.background = element_rect(fill = "transparent"),             # bg of the panel
-    plot.background  = element_rect(fill = "transparent", color = NA), # bg of the plot
-    # panel.grid.major = element_blank(), # get rid of major grid
-    panel.grid.minor = element_blank(), # get rid of minor grid
-    legend.background = element_rect(fill = "transparent"),    # get rid of legend bg
-    # legend.box.background = element_rect(fill = "transparent"), # get rid of legend panel bg,
-    legend.box.background = element_blank()
-  )
-
-shp <- map_data('usa') ## world
-head(shp)
-
-
-
 
 ## 1. sample number stack bar by year ------------------------------------------------------------
 size_key = 0.4
@@ -490,7 +556,7 @@ size_key = 0.4
 sp_final %>% ggplot() + 
   geom_bar(aes(x=Year, fill = Source), position = "stack") + 
   ylab('Number of sampling locations') +
-  scale_x_continuous(breaks = seq(min(sp$Year), max(sp$Year), by = 1))+
+  scale_x_continuous(breaks = seq(min(sp_final$Year), max(sp_final$Year), by = 1))+
   theme_bw()+
   bg_transparent +
   theme(axis.text.x = element_text(angle = 90, hjust = 1,vjust = 0.5),
@@ -558,19 +624,21 @@ pname <- paste0(dir.fig, 'map_samp_by source2', '.png'); pname
 ```{r}
 names(df_final)
 
-### do_min ------------------------------------------------
-do_min <- df_final %>%
-  ungroup() %>%
-  dplyr::filter(Depth >= 3, Depth <=80) %>%
-  group_by(YEID) %>%
-  slice(which.min(DO))
-length(unique(do_min$YEID))
+## depths distribution
+df_final %>% 
+  # group_by(YEID, lat, lon) %>% tally() %>%
+  dplyr::filter(nchar(YEID) < 10) %>%
+  as.data.frame() %>%
+  ggplot()+
+  # geom_violin(mapping = aes(x = 1, y = n)) + 
+  geom_histogram(aes(x = Depth)) +
+  theme_bw()
+```
 
-fname <- paste0(dirname(dir), '/data/data_for_gee/sample_2000_2019_DO_min.xlsx'); fname  ### xlsx can be smaller than csv file
-writexl::write_xlsx(x = do_min, path = fname)
 
 
 
+```{r - do_depth_max}
 ### do_depth_max ------------------------------------------
 do_depth_max <- df_final %>%
   ungroup() %>%
@@ -580,21 +648,59 @@ length(unique(do_depth_max$YEID))
 
 fname <- paste0(dirname(dir), '/data/data_for_gee/sample_2000_2019_DO_depth_max.xlsx'); fname  ### xlsx can be smaller than csv file
 writexl::write_xlsx(x = do_depth_max, path = fname)
+```
+
+
+
+
+```{r - do_10m}
+
+### do_10m -----------------------------------------------
+do_10m <- df_final %>%
+  ungroup() %>%
+  dplyr::filter(Depth >= 3, Depth <=10) %>%
+  group_by(YEID) %>%
+  
+  ## to see the min, avg, and sd in this depth range
+  dplyr::mutate(
+    DO = median(DO, na.rm = T),
+    n = n()) %>%
+  distinct(YEID, DO, .keep_all = T) %>%
+  dplyr::select(-n) %>%
+  
+  ### take the min DO in this depth range
+  # slice(which.min(DO)) %>%
+  
+  as.data.frame()
+
+fname <- paste0(dirname(dir), '/data/data_for_gee/sample_2000_2019_DO_10m.xlsx'); fname
+writexl::write_xlsx(x = do_10m, path = fname)
+
+
+
+
+
+
 
 
 ### do_20m -----------------------------------------------
 do_20m <- df_final %>%
   ungroup() %>%
-  dplyr::filter(Depth >= 3, Depth <=20) %>%
+  dplyr::filter(Depth >= 10, Depth <=20) %>%
   group_by(YEID) %>%
-  ### to see the min, avg, and sd in this depth range
-  # dplyr::mutate(do_20m_min = min(DO, na.rm = T),
-                # do_20m_avg = mean(DO, na.rm = T),
-                # do_20m_dev = sd(DO, na.rm = T),
-                # n = n()) %>%
+  
+  ## to see the min, avg, and sd in this depth range
+  # dplyr::mutate(
+    # do_20m_min = min(DO, na.rm = T),
+    # do_20m_avg = mean(DO, na.rm = T),
+    # do_10m_med = median(DO, na.rm = T),
+    # do_20m_dev = sd(DO, na.rm = T),
+    # n = n()) %>%
+  
   ### take the min DO in this depth range
   slice(which.min(DO)) %>%
   as.data.frame()
+
 fname <- paste0(dirname(dir), '/data/data_for_gee/sample_2000_2019_DO_20m.xlsx'); fname  ### xlsx can be smaller than csv file
 writexl::write_xlsx(x = do_20m, path = fname)
 
@@ -642,8 +748,23 @@ do_80m %>%
 
 
 
-### - do_min data
-```{r}
+
+
+```{r - do_min}
+### do_min ------------------------------------------------
+do_min <- df_final %>%
+  ungroup() %>%
+  dplyr::filter(Depth >= 3, Depth <=80) %>%
+  group_by(YEID) %>%
+  slice(which.min(DO))
+length(unique(do_min$YEID))
+
+fname <- paste0(dirname(dir), '/data/data_for_gee/sample_2000_2019_DO_min.xlsx'); fname  ### xlsx can be smaller than csv file
+writexl::write_xlsx(x = do_min, path = fname)
+
+
+
+### plot ----------------------------------------------------
 do_min %>%
   ungroup() %>%
   dplyr::filter(Year >= 2005) %>%

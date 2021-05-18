@@ -188,7 +188,7 @@ my.formula <- y ~ x
 df <- data.frame(predicted = predict_train, actual = data_train$yvar); which = 'train'
 # df <- data.frame(predicted = predict_test,  actual = data_test$yvar);  which = 'test'
 
-### plot for `sent` vs. `naturalness`
+### plot for `predicted` vs. `actual`
 cor <- df  %>%
   ggplot(aes(x = actual, y = predicted)) +
   geom_point(alpha = 0.7, shape = 16) +

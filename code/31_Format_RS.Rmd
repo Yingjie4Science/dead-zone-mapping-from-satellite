@@ -1,0 +1,488 @@
+---
+output: html_document
+editor_options: 
+  chunk_output_type: inline
+---
+
+
+
+
+
+# Set up
+
+```{r Packages, include=FALSE}
+# To clear your environment 
+remove(list = ls())
+
+library(readxl)
+library(readr)
+library(dplyr)
+library(proj4)
+library(stringr)
+library(scales)
+library(lubridate)
+
+## data describe 
+library(summarytools)
+
+library(sf)
+library(maps)
+library(mapdata)
+
+library(ggpubr)
+library(RColorBrewer)
+library(viridis)
+# devtools::install_github("jaredhuling/jcolors")
+library(jcolors)
+```
+
+
+```{r Dirs, include=FALSE}
+### Set work dir ----------------------------------------------------------
+path <- rstudioapi::getSourceEditorContext()$path
+dir  <- dirname(rstudioapi::getSourceEditorContext()$path); dir
+dirname(dir)        ## go to parent dir
+setwd(dirname(dir)) ## set this parent dir as root dir
+getwd()
+
+### the data fir 
+dir.do      <- paste0(dirname(dir), '/data/for_gee/'); 
+dir.band    <- paste0(dirname(dir), '/data/from_gee/')
+dir.fig     <- paste0(dirname(dir), '/figures/')
+dir.cleaned <- paste0(dir.band, 'Img2Table_cleaned/'); dir.cleaned
+
+
+## keep more decimals 
+options(digits = 15)
+options(pillar.sigfig = 15)
+
+### Disable Scientific Notation in R
+options(scipen = 999) # Modify global options in R
+
+# today <- format(Sys.time(), "%Y%m%d"); print(today)
+```
+
+
+
+# Data
+
+## 1. Clean RS data
+
+  List and check the number of data files. 
+  
+```{r}
+### CSV path
+# dir_csv <- paste0(dir.band, 'Img2Table_all/New folder/'); dir_csv ## test data set
+dir_csv <- paste0(dir.band, 'Img2Table_all/'); dir_csv
+
+
+### The Year - testing code
+# yr <- 2014
+
+
+### List data files
+for (yr in 2000:2019) {
+  # print(yr)
+  fs <- list.files(path = dir_csv, pattern = paste0('^', yr, '.*\\.csv$'), full.names = T); 
+  cat(length(fs), 'files in', yr, '\n')
+}
+
+## -> for years 2003-2019, there are 61 files
+## -> there is no data for Aqua in 2000 and 2001, thus lacking 14 files. 
+```
+
+
+
+### - Loop and clean the RS data
+  **Note**
+  1.  There are some missing dates in the MODIS data, because of MODIS Outages. 
+      See details here: https://modaps.modaps.eosdis.nasa.gov/services/production/outages_terra.html
+      Example: in Terra, 2000-218 - 2000-231	(August 05, 2000 - August 18, 2000	22:15	16:00) are missing. 
+```{r eval=FALSE, warning=FALSE, include=FALSE}
+## test
+# yr <- 2000
+
+yr_ini <- 2000
+# yr_ini <- 2019
+yr_end <- 2019
+
+
+## Because of the missing date in RS data, we constructed a function to include the whole list of dates in a year
+getwd()
+source("function_format_rs_timeseries.R")
+
+
+
+## LOOP YEAR - START
+for (yr in yr_ini:yr_end) { ## 2000:2019
+
+  
+  ### 1.1. loop-terr -----------------------------------------------------------------------
+  files <- list.files(path = dir_csv, pattern = paste0('^', yr, '.*', 'terr', '.*\\.csv$'), full.names = T); files
+  cat('\nNumber of files:', length(files), 'in', yr)
+  
+  ds <- data.frame()
+  
+  for (file in files) {
+    yr <- as.numeric(substr(basename(file), 1, 4)); yr
+    sensor <- substr(basename(file), 6, 9); sensor
+    band  <- str_sub(basename(file), start = 11); band
+    bandv <- gsub('.csv', '', band); bandv
+    
+    d1 <- read_csv(file = file, col_types = cols())
+    # names(d1)
+    ### remove some columns that are not needed. 
+    d2 <- d1 %>%
+      dplyr::mutate(band = bandv) %>%
+      dplyr::select(YEID, featureID, band, 2:Date) %>%
+      dplyr::select(-Date)
+    
+    ### wide format to long format, and put dates in rows
+    d3 <- d2 %>%
+      gather(key = 'date_img', value = 'rs', 4:ncol(.)) %>%
+      dplyr::mutate(rs = as.numeric(rs))  
+    colname_order <- names(d3)
+    
+    ### construct the match between YEID and whole list of dates
+    d0 <- function_format_rs_timeseries(df = d1, yr = yr)
+    
+    ndays_missing <- (nrow(d0) - nrow(d3))/length(unique(d1$YEID))
+    cat('\n There are', ndays_missing, 'missing days in', yr)
+    
+    
+    ### fill the missing dates gap, but these dates would be still NA
+    d4 <- merge(x = d0, y = d3, by = names(d0), all.x = T) %>%
+      dplyr::mutate(band = bandv) %>%
+      dplyr::select(all_of(colname_order))
+    
+    ### bind data of each variable
+    ds <- rbind(ds, d4)
+  }
+  
+  # dfSummary(ds)
+  ds_terr <- ds
+  names(ds)
+  
+  
+  ### double-check the data - there are fewer data from Terr than Aqua
+  ds_terr_count <- ds_terr %>%
+    dplyr::mutate(year = year(date_img)) %>%
+    group_by(year, band) %>%
+    tally() %>%
+    dplyr::mutate(n_location = n/214) ## 214 days
+  ds_terr_count %>% dplyr::distinct(year, n_location)
+  
+  
+  
+    
+  ### 1.2. loop-aqua -----------------------------------------------------------------------
+  
+  ## because there is no data from Aqua in 2000-2002, here we use the Terr data for Aqua to ensure the function and workflow can continue.  
+  
+  if(yr < 2003){
+    cat('\nCopy data values from Terr')
+    ds_aqua <- ds_terr
+    
+    } else {
+    cat("\nRead the actual Aqua data")
+
+
+    files <- list.files(path = dir_csv, pattern = paste0('^', yr, '.*', 'aqua', '.*\\.csv$'), full.names = T); files
+    cat('\nNumber of files:', length(files), 'in', yr) ## (2019-2005+1)*14 = 210
+    
+    ds <- data.frame()
+    
+    for (file in files) {
+      yr <- as.numeric(substr(basename(file), 1, 4)); yr
+      sensor <- substr(basename(file), 6, 9); sensor
+      band <- str_sub(basename(file), start = 11); band
+      bandv <- gsub('.csv', '', band); bandv
+      
+      d1 <- read_csv(file = file, col_types = cols())
+      # names(d1)
+      d2 <- d1 %>%
+        dplyr::mutate(band = bandv) %>%
+        dplyr::select(YEID, featureID, band, 2:Date) %>%
+        dplyr::select(-Date)
+      d3 <- d2 %>%
+        gather(key = 'date_img', value = 'rs', 4:ncol(.)) %>%
+        dplyr::mutate(rs = as.numeric(rs)) 
+      colname_order <- names(d3)
+    
+      ### construct the match between YEID and whole list of dates
+      d0 <- function_format_rs_timeseries(df = d1, yr = yr)
+      
+      ndays_missing <- (nrow(d0) - nrow(d3))/length(unique(d1$YEID))
+      cat('\n There are', ndays_missing, 'missing days in', yr)
+      
+      
+      ### fill the missing dates gap, but these dates would be still NA
+      d4 <- merge(x = d0, y = d3, by = names(d0), all.x = T) %>%
+        dplyr::mutate(band = bandv) %>%
+        dplyr::select(all_of(colname_order))
+      
+      ### bind data of each variable
+      ds <- rbind(ds, d4)
+      
+    }
+    
+    
+    # dfSummary(ds)
+    ds_aqua <- ds
+    
+    
+    ### double-check the data - there are fewer data from Terr than Aqua
+    ds_aqua_count <- ds_aqua %>%
+      dplyr::mutate(year = year(date_img)) %>%
+      group_by(year, band) %>%
+      tally() %>%
+      dplyr::mutate(n_location = n/214) ## 214 days
+    ds_aqua_count %>% distinct(year, n_location)
+    # ds_aqua_count_daysPerYear <- ds_aqua %>%
+    #   dplyr::mutate(year = year(date_img)) %>%
+    #   group_by(YEID, year, band) %>%
+    #   tally()
+  }
+  
+  
+  
+  
+  
+  
+  ### 1.3. merge the 2 sensors ------------------------------------------------------------------
+  ds_2sensor <- merge(x = ds_aqua, y = ds_terr, by = c("YEID", "featureID", "band", "date_img")) 
+  names(ds_2sensor)
+  names(ds_2sensor) <- c( "YEID", "featureID", "band", "date_img", "aqua", "terr")
+  head(ds_2sensor)
+  
+  
+  ### check the variation of two data source
+  ds_2sensor_check <- ds_2sensor %>%
+    dplyr::mutate(dif = aqua - terr) #%>%  arrange(dif)
+  
+  # dfSummary(ds_2sensor_check)
+  hist(ds_2sensor_check$dif)
+  
+  
+  #### scatter plot to compare the 2 sensors --------------------------------------------- -
+  # library(ggpmisc)
+  # my.formula <- y ~ x
+  # ggplot(ds_2sensor, aes(x = aqua, y = terr)) +
+  #   geom_point(alpha = 0.2) +
+  #   facet_wrap(~band, scales = 'free') +
+  #   geom_smooth(method = 'lm', na.rm = T, formula = my.formula) +
+  #   stat_poly_eq(formula = my.formula, aes(label = paste(..eq.label.., ..rr.label.., sep = "~~~")), parse = TRUE) +
+  #   theme_bw()
+  # fname <- paste0(dir.fig, 'band_correlation_auqa_terr.jpg'); fname
+  # ggsave(fname, last_plot(), width = 16, height = 9, dpi = 300, units = 'in')
+  
+  
+  
+  ### take the average value of `aqua` and `terr` as the composite pixel value? ---------- -
+  ### ---> ??? perhaps need to examine if this will cause problems, 
+  ###    as I see the two differ from each other a lot at some locations.
+  ds2w <- transform(ds_2sensor, pixel = rowMeans(ds_2sensor[,5:6], na.rm = TRUE)) %>%
+    dplyr::select(-aqua, -terr, -featureID) %>%
+    spread(key = band, value = pixel) %>%
+    as.data.frame()
+  
+  
+  
+  
+  
+  ### #################################################################################### #
+  ### Other RS data                                                                    #####
+  ### #################################################################################### #
+  
+  ### data3: wind_speed
+  ### data4: velocity_u (Eastward sea water); velocity_v (Northward sea water)
+  ### data5: Salinity_salinity
+  ### data6: bathymetry (NOT TIME SERIES)
+  
+  
+  ### data3: wind_speed --------------------------------------------------------------------
+  files <- list.files(path = dir_csv, pattern = paste0('^', yr, '.*', 'wind_speed', '.*\\.csv$'), full.names = T); files
+  cat('\nNumber of files:', length(files), 'in', yr)
+  
+  ds <- data.frame()
+  for (file in files) {
+    yr <- as.numeric(substr(basename(file), 1, 4)); yr
+    sensor <- substr(basename(file), 11, 20); sensor
+    band <- str_sub(basename(file), start = 11); band
+    band <- gsub('.csv', '', band); band
+    
+    d1 <- read_csv(file = file, col_types = cols())
+    names(d1)
+    d2 <- d1 %>%
+      dplyr::mutate(band = band) %>%
+      dplyr::select(YEID, featureID, band, 2:Date) %>%
+      dplyr::select(-Date)
+    d3 <- d2 %>%
+      gather(key = 'date_img', value = 'rs', 4:ncol(.)) %>%
+      dplyr::mutate(rs = as.numeric(rs)) 
+    ds <- rbind(ds, d3)
+  }
+  ds3w <- ds %>%
+    dplyr::select(-featureID) %>%
+    spread(key = band, value = rs) %>%
+    as.data.frame()
+  
+  
+  
+  ### data4: velocity_u (Eastward sea water); velocity_v (Northward sea water) -------------
+  bands_v = c(
+    "velocity_u_0",  "velocity_u_4",  "velocity_u_10", "velocity_u_20", "velocity_u_30", 
+    "velocity_u_40", "velocity_u_50", "velocity_u_60", "velocity_u_70", "velocity_u_80", 
+    "velocity_v_0",  "velocity_v_4",  "velocity_v_10", "velocity_v_20", "velocity_v_30", 
+    "velocity_v_40", "velocity_v_50", "velocity_v_60", "velocity_v_70", "velocity_v_80")
+  
+  p <- paste(bands_v, collapse = "\\.csv|")
+  files <- list.files(path = dir_csv, pattern = paste0('^', yr, '.*(', p, ')'), full.names = T); files
+  cat('\nNumber of files:', length(files), 'in', yr)
+  
+  length(bands_v) == length(files)
+  
+  
+  ds <- data.frame()
+  for (file in files) {
+    yr <- as.numeric(substr(basename(file), 1, 4)); yr
+    sensor <- substr(basename(file), 6, 13); sensor
+    band <- str_sub(basename(file), start = 15); band
+    band <- gsub('.csv', '', band); band
+    
+    d1 <- read_csv(file = file, col_types = cols())
+    names(d1)
+    d2 <- d1 %>%
+      dplyr::mutate(band = band) %>%
+      dplyr::select(YEID, featureID, band, 2:Date) %>%
+      dplyr::select(-Date)
+    d3 <- d2 %>%
+      gather(key = 'date_img', value = 'rs', 4:ncol(.)) %>%
+      dplyr::mutate(rs = as.numeric(rs)) 
+    ds <- rbind(ds, d3)
+  }
+  ds4 <- ds %>%
+    dplyr::filter(nchar(band)<14) %>% ## remove data at depth >= 100 if any
+    dplyr::select(-featureID) 
+  ds4$band <- factor(x = ds4$band, levels = bands_v)
+  ds4w <- ds4 %>%
+    spread(key = band, value = rs) %>%
+    as.data.frame()
+  
+  
+  
+  ### data5: Salinity_salinity -------------------------------------------------------------
+  bands_s = c(
+    "salinity_0",  "salinity_4",  "salinity_10", "salinity_20", "salinity_30", 
+    "salinity_40", "salinity_50", "salinity_60", "salinity_70", "salinity_80")
+  p = paste(bands_s, collapse = "\\.csv|")
+  files <- list.files(path = dir_csv, pattern = paste0('^', yr, '.*(', p, ')'), full.names = T); files
+  cat('\nNumber of files:', length(files), 'in', yr)
+  
+  ds <- data.frame()
+  for (file in files) {
+    yr <- as.numeric(substr(basename(file), 1, 4)); yr
+    sensor <- substr(basename(file), 6, 18); sensor
+    band <- str_sub(basename(file), start = 20); band
+    band <- gsub('.csv', '', band); band
+    
+    d1 <- read_csv(file = file, col_types = cols())
+    names(d1)
+    d2 <- d1 %>%
+      dplyr::mutate(band = band) %>%
+      dplyr::select(YEID, featureID, band, 2:Date) %>%
+      dplyr::select(-Date)
+    d3 <- d2 %>%
+      gather(key = 'date_img', value = 'rs', 4:ncol(.)) %>%
+      dplyr::mutate(rs = as.numeric(rs)) 
+    ds <- rbind(ds, d3)
+  }
+  ds5 <- ds %>%
+    dplyr::filter(nchar(band)<12) %>%    ## remove data at depth >= 100 if any
+    dplyr::select(-featureID) 
+  ds5$band <- factor(x = ds5$band, levels = bands_s)
+  ds5w <- ds5 %>%
+    spread(key = band, value = rs) %>%
+    as.data.frame()
+  
+  
+  
+  ### data6: bathymetry (NOT TIME SERIES) --------------------------------------------------
+  p <- 'bathymetry'
+  files <- list.files(path = dir_csv, pattern = paste0('^', yr, '.*(', p, ')'), full.names = T); files
+  cat('\nNumber of files:', length(files), 'in', yr)
+  
+  ds <- data.frame()
+  for (file in files) {
+    yr <- as.numeric(substr(basename(file), 1, 4)); yr
+    sensor <- substr(basename(file), 6, 21); sensor
+    band <- str_sub(basename(file), start = 23); band
+    band <- gsub('.csv', '', band); band
+    
+    d1 <- read_csv(file = file, col_types = cols())
+    names(d1)
+    d2 <- d1 %>%
+      dplyr::mutate(band = band) %>%
+      dplyr::select(YEID, featureID, band, 2:Date) %>%
+      dplyr::select(-Date)
+    d3 <- d2 %>%
+      gather(key = 'date_img', value = 'rs', 4:ncol(.)) %>%
+      dplyr::mutate(rs = as.numeric(rs)) 
+    ds <- rbind(ds, d3)
+  }
+  ds6w <- ds %>% 
+    dplyr::select(-featureID, -date_img) %>%
+    spread(key = band, value = rs) %>%
+    as.data.frame()
+    
+  
+  unique(ds2w$YEID) %>% length()
+  unique(ds2w$date_img) %>% length() # 214
+  unique(ds3w$date_img) %>% length() # 212
+  unique(ds4w$date_img) %>% length() # 211
+  unique(ds5w$date_img) %>% length() # 211
+  unique(ds6w$date_img) %>% length() #   1
+  
+  
+  
+  
+  
+  
+  
+  ### #################################################################################### #
+  ### Bind all bands and Save                                                          #####
+  ### #################################################################################### #
+  
+  sapply(list(ds2w, ds3w, ds4w, ds5w, ds6w), names)
+  
+  dss <- ds2w %>% 
+    merge(x = ., y = ds3w, by = c("YEID", "date_img"), all.x = T) %>% 
+    merge(x = ., y = ds4w, by = c("YEID", "date_img"), all.x = T) %>%
+    merge(x = ., y = ds5w, by = c("YEID", "date_img"), all.x = T) %>%
+    merge(x = ., y = ds6w, by = c("YEID"),             all.x = T) %>%
+    as.data.frame()
+  skimr::skim(dss)
+  
+  
+  ### save data (if all years are included) ------ -
+  dirname(dir)
+  fname <- paste0(dir.cleaned, 'rs_sample_', yr, '_ImageBandValue_at_SamplingLocations.RData'); fname
+  save(dss, file = fname)
+  fname <- paste0(dir.cleaned, 'rs_sample_', yr, '_ImageBandValue_at_SamplingLocations.csv');   fname
+  write_csv(x = dss, file = fname)
+  
+
+
+## LOOP YEAR - END
+}
+```
+
+
+
+
+
+## 2. Matching RS and DO sampling 
+
+  To link with sampling location and sampling date info, and to determine Spectrum data 1-week, 2-week, ..., n-week before. 
+  (See the next script)
+

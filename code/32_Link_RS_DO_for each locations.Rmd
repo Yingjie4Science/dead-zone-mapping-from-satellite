@@ -1,0 +1,499 @@
+---
+output: html_document
+editor_options: 
+  chunk_output_type: inline
+---
+
+
+
+
+
+# Set up
+
+```{r Packages, include=FALSE}
+# To clear your environment 
+# remove(list = ls())
+
+library(readxl)
+library(readr)
+library(dplyr)
+library(stringr)
+library(scales)
+library(lubridate)
+
+## data describe 
+library(summarytools)
+
+library(sf)
+library(proj4)
+library(maps)
+library(mapdata)
+
+library(ggpubr)
+library(RColorBrewer)
+library(viridis)
+# devtools::install_github("jaredhuling/jcolors")
+library(jcolors)
+```
+
+
+```{r Dirs, include=FALSE}
+### Set work dir ----------------------------------------------------------
+path <- rstudioapi::getSourceEditorContext()$path
+dir  <- dirname(rstudioapi::getSourceEditorContext()$path); dir
+dirname(dir)        ## go to parent dir
+setwd(dirname(dir)) ## set this parent dir as root dir
+getwd()
+
+### the data fir 
+dir.do      <- paste0(dirname(dir), '/data/for_gee/'); 
+dir.band    <- paste0(dirname(dir), '/data/from_gee/')
+dir.fig     <- paste0(dirname(dir), '/figures/')
+dir.cleaned <- paste0(dir.band, 'Img2Table_cleaned/'); dir.cleaned
+dir.sample  <- paste0(dir.band, 'rs_do_sample/');      dir.sample
+
+
+## keep more decimals 
+options(digits = 15)
+options(pillar.sigfig = 15)
+
+### Disable Scientific Notation in R
+options(scipen = 999) # Modify global options in R
+
+# today <- format(Sys.time(), "%Y%m%d"); print(today)
+```
+
+
+
+# Data
+
+## 1. Clean RS data
+
+## 2. Matching RS and DO sampling 
+
+  To link with sampling location and sampling date info, and to determine Spectrum data 1-week, 2-week, ..., n-week before. 
+ 
+  - The *xlsx data* will be used in `R` script to explore the relationship between `DO` and `bands`. 
+  - The *shp data*  will be uploaded to GEE to train RF model for classification/regression. 
+  
+```{r DO, message=FALSE, warning=FALSE, include=FALSE}
+### DO data with sampling date -----------------------------------------------------------
+### --> choose one as input
+
+# ### 1. if choosing the 'min DO' in the profile
+# whichDO <- 'DO_min'
+# df_do_min    <- readxl::read_excel(path = paste0('./data/data_for_gee/', 'sample_2000_2019_DO_min.xlsx')) %>%
+#   dplyr::mutate(Date = as.Date(Date))
+# 
+#
+# ### 2. if choosing the 'do_10m' in the profile
+# whichDO <- 'Do_10m'
+# df_do_10m <- readxl::read_excel(path = paste0('./data/data_for_gee/', 'sample_2000_2019_DO_10m.xlsx')) %>%
+#   dplyr::mutate(Date = as.Date(Date)); 
+
+
+### 3. if choosing the 'bottom DO' in the profile
+f            <- paste0(dir.do, 'sample_2000_2019_do_bottom.xlsx');  f
+whichDO      <- gsub('sample_2000_2019_|\\.xlsx', '', basename(f)); whichDO
+df_do_bottom <- readxl::read_excel(path = f) %>% dplyr::mutate(Date = as.Date(Date)); 
+
+
+# df_do_input <- df_do_min
+# df_do_input <- df_do_10m
+df_do_input <- df_do_bottom
+
+unique(df_do_input$Year)
+
+unique(df_do_input$YEID) %>% length()
+```
+
+
+
+
+```{r RS input, eval=FALSE, include=FALSE}
+### put RS data from all years in one dataframe
+df_rs <- data.frame()
+
+for (yr in 2000:2019) {
+  # print(yr)
+  
+  fname <- paste0(dir.cleaned, 'rs_sample_', yr, '_ImageBandValue_at_SamplingLocations.RData')
+  # fname
+  load(fname) ## `dss`
+  # cat('\r', nrow(dss), 'records, and', length(unique(dss$YEID)),  'locations',  'in', yr)
+  print(paste('in', yr, length(unique(dss$YEID)),  'locations, and', nrow(dss), 'records', sep = ' '))
+  df_rs <- rbind(df_rs, dss) 
+}
+
+print(paste('2000 - 2019:', length(unique(df_rs$YEID)),  'locations, and', nrow(df_rs), 'records', sep = ' '))
+```
+
+
+```{r RS input save, eval=FALSE, include=FALSE}
+### save data
+fname <- paste0(dir.cleaned, 'rs_sample_combined_2000_2019.RData'); #fname
+save(df_rs, file = fname)
+fname <- paste0(dir.cleaned, 'rs_sample_combined_2000_2019.csv');   #fname
+readr::write_csv(x = df_rs, file = fname)
+```
+
+
+
+
+```{r Merge DO-RS, include=FALSE}
+
+### 1. DO data -------------------------------------------------------------------------
+df_do <- df_do_input %>% 
+  # dplyr::filter(Year == yr) %>%
+  dplyr::mutate(yy = year(Date),
+                mm = month(Date))%>%
+  dplyr::filter(mm <=9) %>%
+  # dplyr::select(-yy, -mm) %>%
+  as.data.frame()
+
+
+### 2. RS data -------------------------------------------------------------------------
+fname <- paste0(dir.cleaned, 'rs_sample_combined_2000_2019.RData'); #fname
+load(file = fname)
+
+df_rs <- df_rs 
+
+
+
+### 3. join DO table and RS ------------------------------------------------------------
+df_merge <- merge(x = df_rs, y = df_do, by = 'YEID', all.y = T) %>%
+  dplyr::mutate(Date = as.Date(Date), date_img = as.Date(date_img)) %>% ## Date for DO, date_img for RS
+  dplyr::select(YEID, Date, date_img, everything()) %>%
+  arrange(YEID, Date, date_img) %>%
+  as.data.frame()
+
+
+### --> data check
+names(df_merge)
+f_check <- df_merge %>% arrange(!is.na(Date), !is.na(date_img)) %>% 
+  dplyr::filter(is.na(yy) | is.na(Year)) %>%
+  dplyr::select(YEID, Date, Year, DO, Depth, Temp, Salin, Source, lat, lon, yy, mm, date_img, chlor_a) %>%
+  distinct(YEID, .keep_all = T)
+## --> a few YEID do not have DO data, to check???
+
+
+gc()
+```
+
+
+
+
+  *Since* there are several RS variables, such as velocity, salinity, have data information at different water depth, we need to consider the actual water depth at each sampling location in order to calculate the indicators for `water stratification`. 
+  
+```{r - cal Stratification, include=FALSE}
+names(df_rs)
+
+## 1. run code to calculate 
+getwd()
+# source("helper_code_Cal_stratification_var.R") ## --> run this would take 30-40 mins; better to run this code separately. 
+
+
+
+## 2. load in the seperate files and bind into one file
+f_ls <- list.files(path = paste0(dir.cleaned, 'rs_stratification'), pattern = 'rs_dif_.*', full.names = T)
+f_ls
+
+df_rs_stra  <- data.frame()
+for (f in f_ls) {
+  x <- load(f)
+  y = get(x) # Get the object by its name
+  rm(x) # Remove the old object since you've stored it in y 
+  ### bind data
+  df_rs_stra <- rbind(df_rs_stra, y)
+}
+
+```
+
+
+
+```{r - update `df_merge`}
+names(df_merge)
+names(df_rs_stra)
+
+nrow(df_merge) == nrow(df_rs_stra) ## should be "TRUE"
+
+
+## 1. remove the variables used for cal stratification
+df_merge1 <- df_merge %>% 
+  dplyr::select(-c("velocity_u_0":"salinity_80"))
+
+df_merge2 <- merge(x = df_merge1, y = df_rs_stra %>% dplyr::select(-n_day_ago), 
+                   by = c("YEID", "Date", "date_img", "Depth"))
+
+## 2. to get the column names in the same order as the original data
+temp1 <- head(df_merge, 1) %>% dplyr::select(-c("velocity_u_0":"mm"))
+temp2 <- head(df_merge, 1) %>% dplyr::select(c("bathymetry":"mm"))
+# names(temp1)
+# names(temp2)
+new_var <- setdiff(names(df_rs_stra), c("YEID", "Date", "date_img", "Depth", "n_day_ago")) %>% sort()
+var_ordered <- c(names(temp1), new_var, names(temp2))
+
+df_mergeX <- df_merge2 %>%
+  dplyr::select(all_of(var_ordered))
+
+
+### to confirm the column names
+# names(df_mergeX)
+# setdiff(names(df_merge), names(df_mergeX))
+# setdiff(names(df_mergeX), names(df_merge))
+```
+
+
+
+
+## 3. Composite and generate model samples
+
+
+```{r - 3.1 Composite by date range, message=FALSE, warning=FALSE, include=FALSE}
+
+unique(df_mergeX$YEID) %>% length() %>% cat('\ntotal YEID:', .)
+
+
+composite <- "mean"
+# composite <- "median"
+
+time_scale <- 'daysBefore'
+# time_scale <- 'weekBefore' 
+
+# interval <-  7  ## every one week as the time lag unit
+interval <- 10    ## every 10 days  as the time lag unit
+# interval <- 11    ## every 11
+
+
+for (nw in seq(1, 8)) {
+  # print(nw)
+  
+  ### 4. Determine the RS time range to be used, considering the time-lag
+  df_merge_nw <- df_mergeX %>%
+    ungroup() %>%
+    # group_by(YEID) %>%
+    dplyr::mutate(year = year(Date)) %>%
+    group_by(YEID, year) %>%
+    dplyr::filter(date_img >= (Date - interval*nw + 1),
+                  date_img <= (Date - interval*(nw - 1))) %>%
+    dplyr::mutate(n_day_ago = Date - date_img,
+                  n_day_ago = as.numeric(n_day_ago)) %>%
+    dplyr::select(YEID, Date, date_img, n_day_ago, everything())
+  
+  ### calculate the mean of RS for each DO sampling location 
+  df_merge_nw_comp <- df_merge_nw %>%
+    as.data.frame() %>%
+    ungroup() %>%
+    as.data.frame() %>%
+    dplyr::mutate(Source = NA) %>%
+    dplyr::select(-Date, -date_img, -n_day_ago) %>%
+    group_by(YEID, year) %>%
+    dplyr::summarise_all(list(composite), na.rm = TRUE) %>%
+    as.data.frame()
+  
+  unique(df_merge_nw_comp$YEID) %>% length() %>% cat('\ntotal YEID:', .)
+
+  ### 4. write to .xlsx ------------------------------
+  prefix <- paste0(interval, 'x', nw, time_scale); prefix 
+  fname <- paste0(dir.sample, 'rs_do_sample_lagByNDay/', 'RS_', whichDO, '_sample_2000_2019_', prefix, '_', composite, '.xlsx');
+  print(basename(fname))
+  # readr::write_csv(x = cbind(nweek_before = nw, df_merge_nw_comp), path = fname)
+  writexl::write_xlsx(x = cbind(nweek_before = nw, df_merge_nw_comp), path = fname)
+  
+  
+  ### 5. convert to .shp -----------------------------
+  projcrs <- "+proj=longlat +datum=WGS84 +no_defs +ellps=WGS84 +towgs84=0,0,0"
+  
+  
+  ### to train RF in GEE, there should be no NA values in each band
+  f_noNA <- df_merge_nw_comp
+  f_shp  <- st_as_sf(x = f_noNA, coords = c("lon", "lat"), remove = F, crs = projcrs) ## crs = 4326 (not sure?)
+  
+  ### write to .shp
+  # shp_name <- paste0('sample_2005to2019_pixelValue_with_', whichDO, '_', nw, 'x', prefix, '_noNA', '.shp');  print(shp_name)
+  # shp_name <- paste0('RS_', whichDO, '_sample_2000_2019_', nw, 'x', prefix, '.shp');  #print(shp_name)
+  # shp_path <- paste0(dir.sample, 'rs_do_sample_lagByNDay/shp/', shp_name); #print(shp_path)
+  # st_write(obj = f_shp, dsn = shp_path, layer = shp_name, driver = "ESRI Shapefile", delete_dsn = T)
+  
+  
+  ### bind to a combined large table --------
+  # df_merge_nw_comps <- rbind(df_merge_nw_comps, cbind(nweek_before = nw, df_merge_nw_comp))
+}
+```
+
+
+
+
+  For each sample location, take the value on the nearest date as model input. 
+  
+  Here, we limit the date range within `11` days, so that no further data values will be used. If there is no non-NA values available within the date range, the variable will remain as NA. 
+  
+  **Caution!!! - This chunk may run for 3-6 hours**
+  
+```{r - 3.2 Composite by picking the Nearest day to fill NA, include=FALSE}
+
+## --> to use the same settings but aim to limit the date range within (interval * nw) days
+interval <- 11
+nw <- 1
+
+
+## --> filter the date range for each location
+df_merge_nw <- df_mergeX %>%
+  ungroup() %>%
+  # group_by(YEID) %>%
+  dplyr::mutate(year = year(Date)) %>%
+  
+  ## test -----------------------------
+  # dplyr::filter(year == 2014) %>%
+  # dplyr::filter(YEID == "2014_006") %>%
+  
+  group_by(YEID, year) %>%
+  dplyr::filter(date_img >= (Date - interval*nw + 1),
+                date_img <= (Date - interval*(nw - 1))) %>%
+  dplyr::mutate(n_day_ago = Date - date_img,
+                n_day_ago = as.numeric(n_day_ago)) %>%
+  dplyr::select(YEID, Date, date_img, n_day_ago, everything())
+
+## --> format data 
+df_merge_nw_comp <- df_merge_nw %>%
+  as.data.frame() %>% ungroup() %>% as.data.frame() %>% dplyr::mutate(Source = NA) %>%
+  dplyr::select(-Date, -date_img) %>%
+  group_by(YEID, year, n_day_ago) %>%
+  arrange(n_day_ago)
+
+## --> to get the number of variables (`n`), the list of sampling locations (`id_ls`)
+n  <- ncol(df_merge_nw_comp);  n
+nm <- names(df_merge_nw_comp); nm
+id_ls <- unique(df_merge_nw_comp$YEID)
+id_ls %>% length()
+
+
+## --> loop by each location, and by each variable
+df_comp <- data.frame()
+
+for (id in id_ls) {
+  
+  ## --> filter data at one sampling location only
+  dfi <- df_merge_nw_comp %>%
+    dplyr::filter(YEID == id)
+  
+  ## --> select each variable, and to get the value from the nearest date
+  for (j in 3:n) {
+  
+    # j = 3
+    # print(j)
+    
+    dj <- dfi %>%
+      ungroup() %>%
+      dplyr::select(1, 2, j) 
+    
+    ### filter and get the dates with non-NA value, and sort by time-lag
+    dj_filter <- dj %>%
+      dplyr::filter_at(3, any_vars(!is.na(.))) %>%
+      as.data.frame() %>%
+      arrange(n_day_ago)
+    
+    ## --> if there are non-NA data, we pick the nearest, which is on the top row; 
+    ##     if all is NA, we use the first record in the whole date range (i.e, first row in `dj`, which is NA for sure)
+    if( nrow(dj_filter) > 0 ) {
+      dji <- dj_filter[1, ]
+    } else {
+      dji <- dj[1, ]
+    }
+    
+    ## --> to keep the time-lag information, we add the var name to a new column and rename the original column as `value` for easier row combine.  
+    dji <- dji %>%
+      dplyr::rename(value = 3) %>%
+      dplyr::mutate(var = nm[j]) %>%
+      dplyr::select(YEID, n_day_ago, var, value)
+    
+    df_comp <- rbind(df_comp, dji)
+    
+  }
+    
+}
+
+
+library(tidyr)
+df_comp_w <- df_comp %>%
+  dplyr::mutate(n_day_ago = '0_11_nearest') %>% ## each var may be taken from different days but between 0-11 days
+  tidyr::spread(key = var, value = value) %>%
+  dplyr::select(all_of(nm)) ## to keep the order of the column names are the same as before
+
+gc()
+
+```
+
+
+
+```{r .... save RData, eval=FALSE, include=FALSE}
+
+note <- print(paste0(
+  'Update on: ', today(), '\n\n', 
+  'This loaded RData include `df_comp`, `df_comp_w`, and a short `note`.\n',
+  'The former one includes which date the value was picked,\n', 
+  'while the latter one removed the date info but provides a ready-to-use data format.\n\n',
+  'Two CSVs with the same data are included in this folder as well.\n',
+  '\n------ from `32_Link_RS_DO_for each locations.Rmd`')
+  )
+fnote <- paste0(dir.sample, 'rs_do_sample_nearestDay/_readme_fromR.txt')
+writeLines(note, fnote)
+
+
+
+### save R data
+fnamer <- paste0(dir.sample, 'rs_do_sample_nearestDay/RS_do_bottom_sample_2000_2019_NearestValuePast11days.RData'); fnamer
+save(df_comp, df_comp_w, note, file = fnamer)
+# load(fnamer)
+
+
+
+### save as csv
+fname <- gsub('RData', 'csv', fnamer);   fname
+readr::write_csv(x = df_comp_w, file = fname)
+
+f <- gsub('.csv', '_withDate.csv', fname); f
+readr::write_csv(x = df_comp, file = f)
+```
+
+
+
+
+
+
+
+```{r - 3.3 Composite by day, message=FALSE, warning=FALSE, include=FALSE}
+
+### DO data with sampling date -------------------------------------------------------------------------
+
+for (nw in seq(0, 90)) {
+  # print(nw)
+  
+  df_merge_nw <- df_mergeX %>%
+    ungroup() %>%
+    dplyr::mutate(year = year(Date)) %>%
+    group_by(YEID, year) %>%
+    dplyr::filter(date_img == Date - nw) %>%
+    dplyr::mutate(n_day_ago = Date - date_img,
+                  n_day_ago = as.numeric(n_day_ago)) %>%
+    dplyr::select(YEID, Date, date_img, n_day_ago, everything())
+  
+  df_merge_nw_comp <- df_merge_nw %>%
+    ungroup() %>%
+    dplyr::select(-Date, -date_img, -n_day_ago) %>%
+    dplyr::select(YEID, year, everything()) %>%
+    # group_by(YEID, year) %>%
+    # summarise_all(list(mean), na.rm = TRUE) %>%
+    as.data.frame()
+  
+  ### save as xlsx --------------------------
+  fname <- paste0(dir.sample, 'rs_do_sample_lagByDay/', 'RS_', whichDO, '_sample_2000_2019_byday_', nw, 'dayBefore.xlsx'); 
+  # print(fname)
+  print(basename(fname))
+  writexl::write_xlsx(x = cbind(nweek_before = nw, df_merge_nw_comp), path = fname)
+
+}
+```
+
+
+

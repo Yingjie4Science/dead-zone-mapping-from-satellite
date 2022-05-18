@@ -1,0 +1,128 @@
+---
+output: html_document
+editor_options: 
+  chunk_output_type: console
+---
+
+
+
+
+**randomForest**
+https://cran.r-project.org/web/packages/randomForest/randomForest.pdf
+
+
+# Set up
+
+```{r Packages and Dirs, include=FALSE}
+# To clear your environment
+remove(list = ls())
+
+# install.packages("randomForest", repos="http://R-Forge.R-project.org")
+library(randomForest)
+# library(tidyverse)
+library(dplyr)
+library(tidyr)
+require(hydroGOF)  ## for calculating RMSE and MAE
+library(Rmisc)     ## `summarySE()` provides sd, se of the mean, and a (default 95%) confidence interval
+
+
+library(cowplot)
+library(ggpubr)
+
+
+### Set work dir ----------------------------------------------------------
+path <- rstudioapi::getSourceEditorContext()$path
+dir  <- dirname(rstudioapi::getSourceEditorContext()$path)
+dir
+dir.root <- dirname(dir)
+setwd(dir.root) ## set this parent dir as root dir
+getwd()
+
+### the data fir
+dir.band    <- './data/data_from_gee/'
+dir.fig     <- paste0(dir.root, '/figures/');   dir.fig
+dir.cleaned <- paste0(dir.band, 'Img2Table_cleaned/'); dir.cleaned
+
+
+## keep more decimals
+options(digits = 10)
+options(pillar.sigfig = 10)
+### Disable Scientific Notation in R
+options(scipen = 999) # Modify global options in R
+
+
+today <- format(Sys.time(), "%Y%m%d"); today
+```
+
+
+```{r}
+theme_my <- 
+  theme_bw() +
+  theme(legend.title = element_blank(), 
+        # panel.grid = element_blank(),
+        panel.grid.minor = element_blank(),
+        legend.background = element_rect(fill="transparent"),
+        # legend.position = c(0.2, 0.75),
+        ) 
+```
+
+
+
+```{r - plot importance}
+list.files(path = './data/results_RF/', pattern = '^rf_importance_', full.names = T)
+
+fname <- paste0('./data/results_RF/rf_importance_by_yearNO.csv');
+fname <- paste0('./data/results_RF/rf_importance_by_yearNO_22vars.csv') ## all veriables
+fname <- paste0('./data/results_RF/rf_importance_by_yearNO_12vars.csv')
+
+xfold <- 5
+
+importance_df <- readr::read_csv(fname) %>%
+  as.data.frame() %>%
+  dplyr::rename(varnames = var, value = score) %>%
+  dplyr::mutate(group = ceiling((lag+1)/xfold)*xfold, 
+                group = ifelse(group>80, 80, group)) %>%
+  as.data.frame()
+names(importance_df)
+
+importance_dfs <- importance_df %>%
+  dplyr::group_by(year, varnames) %>%
+  dplyr::summarise(value = mean(value, na.rm = T)) %>%
+  arrange(year, desc(value))
+
+
+importance_df_summ <- importance_df %>% 
+  Rmisc::summarySE(data = ., measurevar="value", groupvars = c('year', 'varnames', 'group'), na.rm = T) %>%
+  dplyr::mutate(varnames = as.factor(varnames)) %>%
+  arrange(year, group, desc(value))
+
+
+# color_subset <- color14[!names(color14) %in% feature_remove]
+# names(colors) <- levels(importance_df_summ$varnames)
+
+importance_df_summ %>%
+  ggplot(aes(x = reorder(varnames, value), y=value, colour = varnames)) +
+  geom_point(size = 2) +
+  # geom_errorbar(aes(ymin=value-se, ymax=value+se), width=.4, position=position_dodge(0.05)) +
+  geom_errorbar(aes(ymin=value-ci, ymax=value+ci), width=.4, position=position_dodge(0.05), size = 0.5, alpha = 0.7) +
+
+  geom_segment(aes(x = varnames, xend = varnames, y=0, yend= value), size = 0.1) +
+  facet_wrap(~group, ncol = 6) + ## scales = 'free_x'
+  # scale_color_manual(name = 'varnames', values = color_subset)+
+  coord_flip() +
+  theme_my +
+  theme(panel.grid = element_blank(), legend.position = "none") +
+  xlab("Variable Name") +
+  ylab("Importance score")
+
+f <- gsub('rf_|.csv', '', basename(fname))
+f <- paste0(dir.fig, 'var_', f, '.png'); f
+ggsave(filename = f, plot = last_plot(), width = 6.4*1.5, height = 3.2*2.5, units = 'in', dpi = 300)
+
+```
+
+
+
+
+
+

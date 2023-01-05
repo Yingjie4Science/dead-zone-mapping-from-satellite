@@ -4,7 +4,7 @@ author: "Yingjie"
 date: "10/7/2021"
 output: html_document
 editor_options: 
-  chunk_output_type: console
+  chunk_output_type: inline
 ---
 
 
@@ -13,7 +13,7 @@ editor_options:
 
 
 # Setup 
-```{r}
+```{r include=FALSE}
 remove(list = ls())
 
 getwd()
@@ -34,9 +34,9 @@ library(tidyquant)
 # Data
 
 
-## Load data from 3 models. 
+## Load data from 3 models
   
-```{r}
+```{r message=FALSE, warning=FALSE}
 
 # prb <- 0       # to get the actual range (min to max)
 prb <- 2.5/100 # to get 95% quantiles range
@@ -235,7 +235,7 @@ err_rf_test %>%
 
 
 
-## Plot 3 models 
+## Plot model accuracy 
 
 ```{r}
 ### 1. options to plot lines -------------------------------------------------------------

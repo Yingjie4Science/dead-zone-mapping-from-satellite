@@ -1,0 +1,597 @@
+---
+output: html_document
+editor_options: 
+  chunk_output_type: inline
+---
+
+
+
+
+**randomForest**
+https://cran.r-project.org/web/packages/randomForest/randomForest.pdf
+
+
+# Set up
+
+```{r Packages and Dirs, include=FALSE}
+# To clear your environment
+# remove(list = ls())
+
+# library(tidyverse)
+library(dplyr)
+library(tidyr)
+library(lubridate)
+require(hydroGOF)  ## for calculating RMSE and MAE
+library(Rmisc)     ## `summarySE()` provides sd, se of the mean, and a (default 95%) confidence interval
+
+
+library(cowplot)
+library(ggpubr)
+library(viridis)
+
+
+### Set work dir ----------------------------------------------------------
+path <- rstudioapi::getSourceEditorContext()$path
+dir  <- dirname(rstudioapi::getSourceEditorContext()$path)
+dir
+dir.root <- dirname(dir)
+setwd(dir.root) ## set this parent dir as root dir
+getwd()
+
+### the data fir
+dir.band    <- './data/data_from_gee/'
+dir.fig     <- paste0(dir.root, '/figures/');   dir.fig
+dir.cleaned <- paste0(dir.band, 'Img2Table_cleaned/'); dir.cleaned
+
+
+## keep more decimals
+options(digits = 10)
+options(pillar.sigfig = 10)
+### Disable Scientific Notation in R
+options(scipen = 999) # Modify global options in R
+
+
+today <- format(Sys.time(), "%Y%m%d"); today
+```
+
+
+```{r}
+theme_my <- 
+  theme_bw() +
+  theme(legend.title = element_blank(), 
+        # panel.grid = element_blank(),
+        panel.grid.minor = element_blank(),
+        legend.background = element_rect(fill="transparent"),
+        # legend.position = c(0.2, 0.75),
+        ) 
+```
+
+
+
+## ---------------
+
+## Importance
+
+  The importance scores come from `63_RF_Zilong_0516.py`
+  
+```{r message=FALSE, warning=FALSE}
+list.files(path = './data/results_RF/', pattern = '^rf_importance_', full.names = T)
+
+fname <- paste0('./data/results_RF/rf_importance_by_yearNO.csv');
+fname <- paste0('./data/results_RF/rf_importance_by_yearNO_22vars.csv') ## all variables
+fname <- paste0('./data/results_RF/rf_importance_by_yearNO_12vars.csv')
+
+## put every 5 days as a group 
+xfold <- 5
+
+importance_df <- readr::read_csv(fname) %>%
+  as.data.frame() %>%
+  dplyr::rename(varnames = var, value = score) %>%
+  dplyr::mutate(group = ceiling((lag+1)/xfold)*xfold, 
+                group = ifelse(group>80, 80, group)) %>%
+  as.data.frame()
+names(importance_df)
+
+importance_dfs <- importance_df %>%
+  dplyr::group_by(year, varnames) %>%
+  dplyr::summarise(value = mean(value, na.rm = T)) %>%
+  arrange(year, desc(value))
+```
+
+
+
+
+```{r plot}
+importance_df_summ <- importance_df %>% 
+  Rmisc::summarySE(data = ., measurevar="value", groupvars = c('year', 'varnames', 'group'), na.rm = T) %>%
+  dplyr::mutate(varnames = as.factor(varnames)) %>%
+  arrange(year, group, desc(value))
+
+unique(importance_df_summ$group)
+labels_my <- c(
+  '0-5',   '5-10',  '10-15', '15-20', '20-25', '25-30',
+  '30-35', '35-40', '40-45',' 45-50', '50-55', '55-60',
+  '60-65', '65-70', '70-75', '75-80'
+)
+
+importance_df_summ$grp   <- importance_df_summ$group
+importance_df_summ$group <- factor(x = importance_df_summ$group, 
+                                    levels = unique(importance_df_summ$group), 
+                                    labels = labels_my)
+
+# color_subset <- color14[!names(color14) %in% feature_remove]
+# names(colors) <- levels(importance_df_summ$varnames)
+
+
+
+### var name - rename & reorder ----------------------------------------------------------
+###     better present the results
+b <- importance_df_summ %>%
+  dplyr::select(varnames, value, grp) %>%
+  dplyr::filter(grp <= 30) %>%
+  group_by(varnames) %>%
+  dplyr::summarise(value = mean(value, rm.na = T)) %>%
+  arrange(desc(value)) %>%
+  distinct(varnames)
+labels_vars     <- (b$varnames) %>% unique() %>% as.character(); labels_vars
+labels_vars_lab <- labels_vars %>% 
+  gsub('Depth', 'depth', .) %>%
+  gsub('water_temp_surface', 'temp_surface', .) %>%
+  gsub('water_temp_dif',     'temp_dif', .) %>%
+  gsub('velocityu',     'velocity_u', .) %>%
+  gsub('doy_img', 'DOY', .)
+labels_vars_lab
+
+# scale_y_discrete(labels=c("Depth" = "Depth", "water_temp_surface" = "sst", "doy_img" = "DOY")) +
+
+importance_df_summ$varnames <- factor(x = importance_df_summ$varnames, 
+                                      levels = labels_vars, 
+                                      labels = labels_vars_lab, ordered = T)
+levels(importance_df_summ$varnames)
+
+
+importance_df_summ %>%
+  dplyr::filter(grp <=30) %>%
+  # ggplot(aes(x = reorder(varnames, desc(varnames)), y=value, colour = varnames)) +  # x = reorder(varnames, value)
+  ggplot(aes(x = reorder(varnames, desc(varnames)), y=value, colour = value)) + 
+  geom_point(size = 1.5) +
+  geom_segment(aes(x = varnames, xend = varnames, y=0, yend= value), size = 0.1) +
+  # geom_errorbar(aes(ymin=value-se, ymax=value+se), width=.4, position=position_dodge(0.05), size = 0.5, alpha = 0.7) +
+  geom_errorbar(aes(ymin=value-ci, ymax=value+ci), width=.5, position=position_dodge(0.05), 
+                size = 0.2, alpha = 0.7, color = 'gray50') +
+  facet_wrap(~group, ncol = 6) + ## scales = 'free_x'
+  # scale_color_manual(name = 'varnames', values = paletteer_d("ggthemes::Tableau_20"))+
+  # scale_color_distiller(direction = 1, palette = 'viridis') +
+  scale_color_viridis(direction = -1, option = 'D') +
+  coord_flip() +
+  # scale_y_discrete(limits=rev) +
+  theme_my +
+  theme(panel.grid = element_blank(), legend.position = "none") +
+  xlab("Variable Name") +
+  ylab("Importance score")
+
+f <- gsub('rf_|.csv', '', basename(fname))
+f <- paste0(dir.fig, 'var_', f, '_order_0-30.png'); f
+ggsave(filename = f, plot = last_plot(), width = 7, height = 6/3, units = 'in', dpi = 500)
+
+```
+
+
+
+
+```{r for final model}
+imp_model <- importance_df %>%
+  dplyr::filter(lag %in% c(28, 29, 30, 31)) %>%
+  dplyr::mutate(group = 'Final model')
+
+imp_model_summ <- imp_model %>% 
+  Rmisc::summarySE(data = ., measurevar="value", groupvars = c('year', 'varnames', 'group'), na.rm = T) %>%
+  dplyr::mutate(varnames = as.factor(varnames)) %>%
+  arrange(year, group, desc(value))
+
+imp_model_summ$varnames <- factor(x = imp_model_summ$varnames, 
+                                      levels = labels_vars, 
+                                      labels = labels_vars_lab, ordered = T)
+levels(imp_model_summ$varnames)
+
+
+imp_model_summ %>%
+  ggplot(aes(x = reorder(varnames, desc(varnames)), y=value, colour = value)) + 
+  geom_point(size = 1.5) +
+  geom_segment(aes(x = varnames, xend = varnames, y=0, yend= value), size = 0.1) +
+  geom_errorbar(aes(ymin=value-ci, ymax=value+ci), width=.5, position=position_dodge(0.05), 
+                size = 0.2, alpha = 0.7, color = 'gray50') +
+  facet_wrap(~group, ncol = 6) + ## scales = 'free_x'
+  scale_color_viridis(direction = -1, option = 'D') +
+  coord_flip() +
+  theme_my +
+  theme(panel.grid = element_blank(), legend.position = "none") +
+  xlab("Variable Name") +
+  ylab("Importance score")
+
+f <- gsub('rf_|.csv', '', basename(fname))
+f <- paste0(dir.fig, 'var_', f, '_order_finalModel.png'); #f
+ggsave(filename = f, plot = last_plot(), width = 7/2, height = 6/2, units = 'in', dpi = 300)
+```
+
+
+
+
+## Time series of each variable 
+
+```{r - each var, warning=FALSE}
+f1  <- paste0('./data/from_gee/sst_2000_2009.csv')
+f2  <- paste0('./data/from_gee/sst_2010_2019.csv')
+
+f1  <- paste0('./data/from_gee/chlor_a_2000_2009.csv')
+f2  <- paste0('./data/from_gee/chlor_a_2010_2019.csv')
+
+var <- rbind(
+  readr::read_csv(f1) %>% gather(key = year, value = value, 2:ncol(.)),
+  readr::read_csv(f2) %>% gather(key = year, value = value, 2:ncol(.))
+)
+
+hist(var$value)
+
+outlier <- quantile(x = var$value, c(.99), na.rm = T) 
+outlier
+
+
+var <- var %>%
+  dplyr::filter(value < outlier) %>% ## remove outlier
+  dplyr::mutate(date = as.Date(doy, origin = paste0(year, '-01-01')))
+save(var, file = gsub('_2000_2009\\.csv', '.RData', f1))
+
+
+
+
+### - by week
+var_time <- var %>%
+  dplyr::mutate(time = lubridate::week(date)) %>%
+  group_by(year, time) %>%
+  dplyr::summarise(value = median(value, na.rm = T)) %>%
+  dplyr::mutate(
+    year = as.numeric(year),
+    date = as.Date(paste(2014, time, 1, sep="-"), "%Y-%U-%u"))
+
+
+### - by month
+var_time <- var %>%
+  dplyr::mutate(time = lubridate::month(date)) %>%
+  group_by(year, time) %>%
+  dplyr::summarise(value = median(value, na.rm = T)) %>%
+  ungroup() %>%
+  as.data.frame() %>%
+  dplyr::mutate(
+    year = as.numeric(year),
+    date = as.Date(paste('2000', time, '1', sep = '-')))
+
+
+str(var_time)
+
+### - plot
+var_name <- basename(f1) %>% gsub('_2000_2009\\.csv', '', .)
+var_name
+
+var_time %>%
+  ggplot(aes(x = date, y = value, color = year)) +
+  geom_point(alpha = 0.4, shape = 16) + # size = 1, 
+  # geom_line(alpha = 0.5, size = .5) +
+  scale_color_viridis('Year', discrete = F, option = 'D') +
+  scale_x_date(date_labels = "%m", date_breaks = 'month') +  ## see more `?strptime`
+  theme_bw() +   xlab("Month") +   ylab(var_name) +
+  # facet_wrap(~year) +
+  theme(panel.grid.minor = element_blank(), panel.grid = element_line(size = 0.2))
+
+f <- paste0(dir.fig, 'var_', var_name, '.png'); f
+# ggsave(filename = f, plot = last_plot(), width = 7, height = 3, units = 'in', dpi = 600)
+
+
+
+var_time %>%
+  ggplot(aes(x = time, y = value, color = year)) +
+  geom_point(alpha = 0.4, shape = 16) + # size = 1, 
+  geom_line(alpha = 0.5, size = .5) +
+  scale_color_viridis('Year', discrete = F, option = 'D') +
+  # scale_x_date(date_labels = "%m", date_breaks = 'month') +  ## see more `?strptime`
+  theme_bw() +   xlab("Month") +   ylab(var_name) +
+  facet_wrap(~year) +
+  theme(panel.grid.minor = element_blank(), panel.grid = element_line(size = 0.2))
+```
+
+
+
+```{r - chlor_a VS sst}
+load(file = paste0('./data/from_gee/sst.RData'))
+sst <- var 
+load(file = paste0('./data/from_gee/chlor_a.RData'))
+chl <- var
+
+vars <- rbind(
+  cbind(var = 'sst', sst), 
+  cbind(var = 'chlor_a', chl)) 
+
+
+
+# time_scale <- 'week'
+time_scale <- 'weekX2'
+# time_scale <- 'month'
+
+
+if (time_scale == 'week') {
+
+  ### by week 
+  vars_time <- vars %>%
+    dplyr::mutate(time = lubridate::week(date)) %>%
+    group_by(var, year, time) %>%
+    dplyr::summarise(value = median(value, na.rm = T)) %>%
+    # dplyr::summarise(value = mean(value, na.rm = T)) %>%
+    dplyr::mutate(
+      year = as.numeric(year),
+      date = as.Date(paste(2000, time, 1, sep="-"), "%Y-%U-%u"))
+  
+} else if (time_scale == 'weekX2') {
+  
+  
+  ### by two weeks
+  vars_time <- vars %>%
+    dplyr::mutate(day = lubridate::day(date),
+                  month = lubridate::month(date),
+                  time = ifelse(day<=15, 14, 28))  %>%
+    group_by(var, year, month, time) %>%
+    dplyr::summarise(value = median(value, na.rm = T)) %>%
+    # dplyr::summarise(value = mean(value, na.rm = T)) %>%
+    dplyr::mutate(
+      year = as.numeric(year),
+      date = as.Date(paste(2000, month, time, sep="-"))) %>%
+    as.data.frame()
+  
+} else {
+  
+  ### by month
+  vars_time <- vars %>%
+    dplyr::mutate(time = lubridate::month(date)) %>%
+    group_by(var, year, time) %>%
+    dplyr::summarise(value = median(value, na.rm = T)) %>%
+    dplyr::mutate(
+      year = as.numeric(year),
+      date = as.Date(paste(2000, time, 1, sep="-")))
+}
+  
+  
+
+
+vars_w <- vars_time %>%
+  spread(key = var, value = value)
+
+
+coeff = 0.400
+y1_color <- '#d7191c'#'#b2182b'
+y2_color <- '#1b9e77' #'#2166ac'
+  
+vars_w %>%
+  ggplot(aes(x = date)) +
+  geom_line(aes(y = sst), color = y1_color, size = .7) +
+  geom_line(aes(y = chlor_a / coeff),  color = y2_color, size = .7) + # Divide by 10 to get the same range than the temperature
+  
+  scale_y_continuous(
+    # Features of the first axis
+    name = "sst (°C)",
+    # Add a second axis and specify its features
+    sec.axis = sec_axis(~.*coeff, name="chlor_a")
+  ) +
+  # scale_color_viridis('Year', discrete = T, option = 'D') +
+  scale_x_date(date_labels = "%m", date_breaks = '2 months') +  ## see more `?strptime`
+  # geom_vline(xintercept = as.Date(paste(2000, 7, 1, sep="-"))) +
+  
+  geom_rect(
+      data = data.frame(year = factor(
+        c(2002:2004,
+          seq(2006, 2011, 1), 
+          seq(2013, 2017, 1), 2019)
+        )), ## not to add 'rect' for FDA
+      aes(x = NULL, y = NULL,
+          xmin=as.Date('2000-06-01'),
+          xmax=as.Date('2000-08-30'), ymin=-Inf, ymax=Inf),
+      fill = 'orange', alpha = 0.2) +
+  
+  theme_bw() +   xlab("Month") + 
+  facet_wrap(~year) +
+  theme(panel.grid.minor = element_blank(), 
+        panel.grid = element_line(size = 0.2),
+        axis.title.y.left  = element_text(color = y1_color, size = 16),
+        axis.title.y.right = element_text(color = y2_color, size = 16), 
+        axis.text.y.left = element_text(color = y1_color), 
+        axis.text.y.right = element_text(color = y2_color), 
+        axis.line.y.left =  element_line(color = y1_color),
+        axis.line.y.right = element_line(color = y2_color),
+        
+    )
+
+f <- paste0(dir.fig, 'var_sst_chlor_', time_scale, '_median.png'); f
+ggsave(filename = f, plot = last_plot(), width = 12/1.5, height = 10/1.5, units = 'in', dpi = 400)
+```
+
+
+
+
+
+```{r - chlor_a VS N}
+dir.N <- "G:/Shared drives/Science_L_W/dz_N/Louisiana_WQP/"
+
+
+f1 <- paste0(dir.N, "processed/AR_Melville_tnload_daily.csv")
+f2 <- paste0(dir.N, "processed/MR_StFrancisville_tnload_daily.csv")
+tn_ar <- readr::read_csv(f1) 
+tn_mr <- readr::read_csv(f2) 
+
+vars <- rbind(
+  cbind(var = 'TN_ar', tn_ar) %>% dplyr::select(var, year, load_ktday, date) %>% dplyr::rename(value = load_ktday),
+  cbind(var = 'TN_mr', tn_mr) %>% dplyr::select(var, year, load_ktday, date) %>% dplyr::rename(value = load_ktday),
+  cbind(var = 'chlor_a', chl) %>% dplyr::select(-doy)
+  ) 
+
+
+vars_2weeks <- vars %>%
+  dplyr::filter(var == 'chlor_a') %>%
+  dplyr::mutate(
+    month = lubridate::month(date), 
+    day   = lubridate::day(date),
+    time  = ifelse(day<=15, 14, 28)
+    ) %>%
+  group_by(var, year, month, time) %>%
+  dplyr::summarise(value = median(value, na.rm = T)) %>%
+  # dplyr::mutate(value = ifelse(
+  #   var == 'TN', 
+  #   value*15, ## total load within each 14 days (~ 15 days = half month) range
+  #   value)) %>%
+  dplyr::mutate(
+    year  = as.numeric(year),
+    date  = as.Date(paste(2000, month, time, sep="-"))) %>%
+  as.data.frame()
+
+
+tn_month <- vars %>% 
+  dplyr::filter(var %in% c('TN_ar', 'TN_mr')) %>%
+  dplyr::mutate(
+    date = as.Date(date),
+    month = lubridate::month(date), 
+    day   = lubridate::day(date)
+    ) %>%
+  group_by(var, year, month) %>%
+  dplyr::summarise(value = mean(value, na.rm = T)) %>%
+  dplyr::mutate(value = ifelse(
+    var != 'chlor_a', 
+    value*30, ## total load within each 14 days (~ 15 days = half month) range
+    value)) %>%
+  dplyr::mutate(
+    year  = as.numeric(year),
+    date  = as.Date(paste(2000, month, '14', sep="-"))) %>%
+  as.data.frame()
+
+# names(vars_2weeks)
+# names(tn_month)
+# str(tn_month)
+
+
+vars_w <- rbind(
+  vars_2weeks %>% dplyr::select(-time), 
+  tn_month
+) %>%
+  spread(key = var, value = value)
+
+
+# skimr::skim(vars_w)
+# str(vars_w)
+
+
+### cal correlation ----------------------------------------------------------------------
+### - 1. no lag 
+dat <- vars_w
+
+### - 2. 1 month lag
+dat <- rbind(
+  vars_2weeks %>% dplyr::select(-time, -month), 
+  tn_month %>% 
+    dplyr::mutate(var = 'TN', 
+                  date = date %m+% months(1)) %>%
+    group_by(var, year, date) %>%
+    dplyr::summarise(value = sum(value, rm.na = T)) %>%
+    as.data.frame()
+) %>%
+  spread(key = var, value = value)
+
+
+### - data for plotting 
+d <- dat %>%
+  drop_na() %>%
+  dplyr::filter(!year %in% c(2000, 2002, 2007, 2009:2013, 2015, 2018)) %>%
+  dplyr::select(-date)
+# library(corrplot)
+# corrplot(cor(d),
+#   method = "number",
+#   type = "upper" # show only upper side
+# )
+
+library(GGally)
+ggpairs(d)
+
+
+d %>%
+  group_by(year) %>%
+  dplyr::summarize(COR = cor(chlor_a, TN)) %>%
+  as.data.frame() %>%
+  Rmisc::summarySE(data = ., measurevar = 'COR', na.rm = T) %>%
+  as.data.frame()
+
+
+### plot TN only -------------------------------------
+var_tn <- vars_w %>%
+  dplyr::select(-chlor_a) %>%
+  gather(key = var, value = value, TN_ar:TN_mr) %>%
+  dplyr::filter(!is.na(value))
+
+# vars_w %>%
+#   dplyr::filter(!is.na(TN)) %>%
+#   ggplot(aes(x = date)) +
+#   geom_line(aes(y = TN), alpha = 0.8, color = y1_color, size = .7) +
+#   scale_x_date(date_labels = "%m", date_breaks = '1 months') + 
+#   facet_wrap(~year, scales = 'free_x')
+  
+
+### plot the two -------------------------------------  
+coeff <- 0.09
+y1_color <- '#fe9929'
+vars_w %>%
+  ggplot(aes(x = date)) +
+  geom_line(data = var_tn, aes(y = value, 
+                               # alpha = value, 
+                               linetype = var), 
+            # alpha = 0.8, 
+            color = y1_color, size = .7, show.legend = F) +
+  scale_linetype_manual(values = c('dashed', 'solid')) +
+  # geom_point(data = var_tn, aes(y = value, alpha = value, shape = var), 
+  #            color = y1_color, size = 1, show.legend = F) +
+  geom_line(aes(y = chlor_a/coeff),  color = y2_color, size = .7) + # Divide by 10 to get the same range than the temperature
+  
+  scale_y_continuous(
+    # Features of the first axis
+    name = "TN (kt)",
+    # Add a second axis and specify its features
+    sec.axis = sec_axis(~.*coeff, name="chlor_a")
+  ) +
+  # scale_color_viridis('Year', discrete = T, option = 'D') +
+  scale_x_date(date_labels = "%m", date_breaks = '2 months') +  ## see more `?strptime`
+  # geom_vline(xintercept = as.Date(paste(2000, 7, 1, sep="-"))) +
+  
+  geom_rect(
+      data = data.frame(year = factor(
+        c(2002:2004,
+          seq(2006, 2011, 1), 
+          seq(2013, 2017, 1), 2019)
+        )), ## not to add 'rect' for FDA
+      aes(x = NULL, y = NULL,
+          xmin=as.Date('2000-06-01'),
+          xmax=as.Date('2000-08-30'), ymin=-Inf, ymax=Inf),
+      fill = 'orange', alpha = 0.2) +
+  
+  theme_bw() + xlab("Month") +
+  facet_wrap(~year) +
+  theme(panel.grid.minor = element_blank(), 
+        panel.grid = element_line(size = 0.2),
+        axis.title.y.left  = element_text(color = y1_color, size = 16),
+        axis.title.y.right = element_text(color = y2_color, size = 16), 
+        axis.text.y.left = element_text(color = y1_color), 
+        axis.text.y.right = element_text(color = y2_color), 
+        axis.line.y.left =  element_line(color = y1_color),
+        axis.line.y.right = element_line(color = y2_color),
+        
+    )
+
+
+f <- paste0(dir.fig, 'var_TN_chlor_', time_scale, '_median2.png'); f
+ggsave(filename = f, plot = last_plot(), width = 12/1.5, height = 10/1.5, units = 'in', dpi = 400)
+
+```
+
+

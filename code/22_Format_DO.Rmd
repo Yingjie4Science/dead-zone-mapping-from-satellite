@@ -1,0 +1,460 @@
+---
+output: html_document
+editor_options: 
+  chunk_output_type: inline
+---
+
+
+# Set up
+```{r Packages, include=FALSE}
+# To clear your environment 
+# remove(list = ls())
+
+library(readxl)
+library(tidyverse)
+library(dplyr)
+library(stringr)
+library(scales)
+library(lubridate)
+
+## data describe 
+library(summarytools)
+
+library(sf)
+library(proj4)
+library(maps)
+library(mapdata)
+
+library(RColorBrewer)
+library(viridis)
+# devtools::install_github("jaredhuling/jcolors")
+library(jcolors)
+library(scico) ## colors
+```
+
+
+```{r Dirs, include=FALSE}
+### Set work dir ----------------------------------------------------------
+path <- rstudioapi::getSourceEditorContext()$path
+dir  <- dirname(rstudioapi::getSourceEditorContext()$path); dir
+dirname(dir)        ## go to parent dir
+# setwd(dirname(dir)) ## set this parent dir as root dir
+# knitr::opts_knit$set(root.dir = dirname(dir))
+getwd()
+
+### the data dir ----------------------------------------------------------
+dir.root   <- dirname(dir)
+dir.do     <- paste0(dir.root, '/data/for_gee/'); dir.do
+dir.fig    <- paste0(dir.root, '/figures/'); dir.fig
+
+dir.path   <- paste0(dir.root, '/data/DO/DO_GOM/DO_Integrated_Matli_NCSU')
+dir.output <- paste0(dir.path, '/data_cleaned/'); dir.output
+
+setwd(dir.path)
+# knitr::opts_knit$set(root.dir  = dir.path)
+# knitr::opts_chunk$set(root.dir = dir.path)
+
+
+getwd()
+
+today <- format(Sys.time(), "%Y%m%d"); print(today)
+
+### keep more decimals 
+options(digits = 15)
+options(pillar.sigfig = 15)
+```
+
+
+```{r Shapefile, include=FALSE}
+library(sf)
+library(maps)
+library(mapdata)
+
+bg_transparent <- 
+  theme(
+    panel.background = element_rect(fill = "transparent"),             # bg of the panel
+    plot.background  = element_rect(fill = "transparent", color = NA), # bg of the plot
+    # panel.grid.major = element_blank(), # get rid of major grid
+    panel.grid.minor = element_blank(), # get rid of minor grid
+    legend.background = element_rect(fill = "transparent"),    # get rid of legend bg
+    # legend.box.background = element_rect(fill = "transparent"), # get rid of legend panel bg,
+    legend.box.background = element_blank()
+  )
+
+shp <- map_data('usa') ## world
+head(shp)
+
+
+getwd()
+gom <- sf::st_read(dsn = paste0(dir.root, '/data/shp/region_rectangle.shp'))
+```
+
+
+# Data import
+
+## * All DO data for GEE
+  - 1. DO profile data
+  - 2. location table for extracting spectral data in GEE
+  
+  First, define which years will be included in this analysis. For the 2nd paper, since we plan to use MODIS data only, then starting year will be 2000. This is because Terra data is avaibale since 2000/02 and Aqua is available since 2002/07. 
+  
+```{r}
+yr_ini <- 2000
+yr_end <- 2019
+
+### load cleaned data (`df_final`) ------------------------------------------------------------
+# fname <- paste0(dir.output, 'DO_Integrated_sf_sp_final_2000_2019.RData'); fname ## updated on 2022-03-08
+fname <- paste0(dir.output, 'DO_Integrated_sf_sp_final_2000_2021.RData'); fname
+load(fname)
+names(df_final)
+
+### 1. DO profile data
+df_final_do <- df_final %>%
+  dplyr::filter(Year >= yr_ini) %>%
+  dplyr::filter(Year <= yr_end) %>%
+  dplyr::select(-Depth_dem, -Instrument, -ShelfW, -NSW, -E, -N, -Cruise, -Corr) %>% ## remove these variables
+  # dplyr::select(YEID, Year, Date, DO, Depth, Temp, Salin, Source, lat, lon) %>% 
+  dplyr::filter(Depth <= 80) %>%
+  dplyr::mutate(Date = as.Date(Date))
+
+
+### 2. location table (NOT SURE WE SHOULD INCLUDE "hypoxia watch" data, perhaps NOT at this moment)
+df_final_pt <- sp_final %>%
+  dplyr::filter(Year >= yr_ini) %>%
+  dplyr::filter(Year <= yr_end) %>%
+  dplyr::filter(YEID %in% unique(df_final_do$YEID)) %>% ## make sure all sample locations have DO data
+  dplyr::select(YEID, Date, Year, Source, lat, lon) %>%
+  distinct(YEID, .keep_all = T) %>%
+  dplyr::mutate(Date = as.Date(Date))%>%
+  dplyr::mutate(id = row.names(.))
+
+### --> how many sampling locations in each year?
+df_final_pt %>%
+  ungroup() %>% dplyr::group_by(Year) %>% tally()
+
+### point to sf
+projcrs <- "+proj=longlat +datum=WGS84 +no_defs +ellps=WGS84 +towgs84=0,0,0"
+df_final_pt_sf <- st_as_sf(df_final_pt, coords = c("lon", "lat"), crs = projcrs)
+
+
+## rename the data for future use
+do <- df_final_do;      
+pt <- df_final_pt;      
+sp <- df_final_pt_sf
+
+cat('there are', nrow(do), 'samples')
+cat('there are', unique(do$YEID)%>%length(), 'sampling locations')
+cat('there are', nrow(pt), 'sampling locations')
+```
+
+
+
+  *Data check*: why `do` has less location than `pt`?
+```{r echo=FALSE}
+t1 <- do %>%
+  distinct(YEID, .keep_all = T)
+
+t2 <- pt %>%
+  distinct(YEID, .keep_all = T)
+
+tt <- merge(x = t1 %>% dplyr::select(YEID, Depth, DO), 
+            y = t2 %>% dplyr::select(YEID, id), 
+            by = "YEID", all = T) %>%
+  arrange(!is.na(Depth))
+
+
+
+df_final %>% dplyr::filter(YEID == '2000_069') ## NO DATA. 
+
+## --> action: add `dplyr::filter(YEID %in% unique(df_final_do$YEID)) %>%` to `df_final_pt`
+
+cat('There are', nrow(t2)-nrow(t1), 'locations without DO info.')
+```
+
+
+
+
+```{r Save to RData, include=FALSE}
+### write to file ---------------------------
+fname <- paste0(dir.do, 'sample_00_19_do.xlsx'); fname  ### xlsx can be smaller than csv file
+# writexl::write_xlsx(x = do, path = fname)
+# fname <- paste0(dirname(dir), '/data/data_for_gee/sample_2000_2019_DO.csv'); fname 
+# write.csv(x = do, file = fname, row.names = F)
+
+fname <- paste0(dir.do, 'sample_00_19_locations.csv'); fname
+write.csv(x = pt, file = fname, row.names = F)
+
+fname <- paste0(dir.do, 'sample_00_19_locations.shp'); fname
+st_write(obj = sp, fname, delete_layer = TRUE, delete_dsn = T) # overwrites
+
+fname <- paste0(dir.do, 'sample_00_19_do_pt_sp.RData'); fname
+save(do, pt, sp, file = fname)
+```
+
+
+
+```{r !! upload to GEE}
+```
+  Here, we need to upload 'sample_00_19_locations.shp' to GEE for extracting pixel values. 
+
+
+
+
+## * Data description
+
+```{r - Fig 1. Samples by year & by source}
+### load DO final data - "do, pt, sp"
+fname <- paste0(dir.do, 'sample_00_19_do_pt_sp.RData'); fname
+load(fname)
+
+
+## 1. sample number stack bar by year ------------------------------------------------------------
+size_key = 0.4
+scaleFUN <- function(x) sprintf("%.0f", x)
+
+
+# pt %>% 
+#   dplyr::filter(Year >= yr_ini) %>%
+#   ggplot() + 
+#   geom_bar(aes(x=Year, fill = Source), position = "stack") + 
+#   ylab('Number of sampling locations') +
+#   scale_x_continuous(n.breaks = 10, labels=scaleFUN)+
+#   theme_bw()+
+#   bg_transparent +
+#   theme(axis.text.x = element_text(angle = 90, hjust = 1,vjust = 0.5),
+#         # legend.key.size   = unit(size_key, "cm"),
+#         legend.key.height = unit(size_key, "cm"),
+#         legend.key.width  = unit(size_key, "cm")) +
+#   theme(legend.position = c(0.9, 0.8)) 
+
+library(wesanderson)
+### this is the same plot but with labels 
+pt %>%
+  dplyr::filter(Year >= yr_ini) %>%
+  ungroup() %>%
+  distinct(YEID, .keep_all = T) %>%
+  group_by(Year, Source) %>%
+  tally() %>%
+  ungroup() %>%
+  group_by(Year) %>%
+  dplyr::mutate(sum = sum(n)) %>%
+  ggplot() +
+  geom_col(aes(x = Year, y = n, fill = Source), alpha = .7) +
+  geom_text(aes(x = Year, y = sum, label = sum), hjust = 0.5, vjust = -0.5, size = 2.5) + 
+  theme_bw() + 
+  scale_x_continuous(#n.breaks = 19, labels=scaleFUN, 
+                     breaks = seq(from = 2000, to = 2019, by = 1)) +
+  scale_fill_brewer(palette = "Set2", direction = -1) +
+  # scale_fill_manual(values = wes_palette("Royal1", n = 6, type = 'continuous')) +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1,vjust = 0.5),
+        legend.key.height = unit(size_key, "cm"),
+        legend.key.width  = unit(size_key, "cm"),
+        legend.position = c(0.9, 0.8),
+        panel.grid.minor = element_blank()) +
+  ylab(expression(paste('Number of sampling locations', ''))) 
+pname <- paste0(dir.fig, 'sample_num_bySource_DZT.png'); pname
+ggsave(filename = pname, plot = last_plot(), width = 7, height = 5, units = 'in', dpi = 300) ## bg = "transparent",
+```
+
+
+
+```{r - Fig S1. Sample map by year}
+## 2. sample distribution facet by year --------------------------------------------------
+pt %>% 
+  dplyr::filter(Year >= yr_ini) %>%
+  ggplot() + 
+  geom_point(aes(x = lon, y = lat, color = Source), alpha = 0.7, size = 0.2) +
+  # scale_color_brewer(palette = "Dark2") +
+  facet_wrap(.~Year)+
+  theme_bw() +
+  xlab('Longitude') + ylab('Latitude')+
+  guides(color = guide_legend(override.aes = list(size=4))) ## enlarge the key size
+
+pname <- paste0(dir.fig, 'sample_map_byYear_R1.png'); pname
+ggsave(filename = pname, plot = last_plot(), width = 7, height = 5, units = 'in', dpi = 300)
+```
+```{r}
+pt %>% 
+  dplyr::filter(Year >= yr_ini) %>%
+  # dplyr::mutate(Source = fct_rev(Source)) %>%
+  ggplot() + 
+  geom_sf(data = gom, color = "NA", fill = "NA") + 
+  geom_point(aes(x = lon, y = lat, color = Source, size = Year, alpha=-Year), 
+             # alpha = 0.4, 
+             shape = 1) +
+  # scale_color_brewer(palette = "Dark2") +
+  # scale_size_continuous(trans = ) +
+  scale_size_binned(nice.breaks = T, n.breaks = 5, range = c(0,5))+
+  scale_alpha_binned(range = c(0.1, 1))+
+  theme_bw() +
+  xlab('Longitude') + ylab('Latitude')+
+  guides(color = guide_legend(override.aes = list(size=4))) + ## enlarge the key size
+  theme(legend.position="bottom", 
+        # legend.direction = "horizontal", 
+        legend.direction = "vertical", 
+        # legend.box ="vertical", 
+        legend.box = "horizontal",
+        # legend.spacing.x = unit(10, "mm"),
+        legend.box.margin = margin(0, 0, 0, 0)) + ## legend.box="vertical", legend.margin=margin()
+  guides(fill=guide_legend(nrow=2, byrow=TRUE),
+         label.theme = element_text(angle = 90, vjust = 0.5))
+
+pname <- paste0(dir.fig, 'sample_map_byYear_bySource2.png'); pname
+ggsave(filename = pname, plot = last_plot(), width = 7, height = 5, units = 'in', dpi = 300)
+```
+
+
+```{r - Fig. Sample map by source}
+## 3. sample distribution facet by data source -------------------------------------------
+pt %>% 
+  ggplot() + 
+  geom_point(aes(x = lon, y = lat, color = Year), alpha = 0.4, size = 0.2) +
+  facet_wrap(.~Source)+
+  # scale_color_gradient2(low = 'blue', mid = 'green', high = 'red', midpoint = 2000)+
+  scale_color_viridis(option = "D") +
+  xlab('Longitude') + ylab('Latitude')+
+  theme_bw()
+pname <- paste0(dir.fig, 'sample_map_bySource_update2019_R1.png'); pname
+# ggsave(filename = pname, plot = last_plot(), width = 7, height = 5, units = 'in', dpi = 300)
+
+```
+
+
+
+
+
+
+## * DO bottom
+
+  do_min:       minimum DO at 3-80m depth across the profile 
+  do_bottom: DO at the max depth (3-80m) across the profile
+  do_20m:       DO at  3-20m depth across the profile
+  do_50m:       DO at 21-50m depth across the profile
+  do_80m:       DO at 51-80m depth across the profile
+
+```{r}
+names(do)
+
+### depths distribution --------------------------------
+max(do$Depth) 
+
+do %>% 
+  # group_by(YEID, lat, lon) %>% tally() %>%
+  # dplyr::filter(nchar(YEID) < 10) %>%
+  as.data.frame() %>%
+  ggplot()+
+  # geom_violin(mapping = aes(x = 1, y = n)) + 
+  # facet_wrap(~Year) +
+  geom_histogram(aes(x = Depth)) +
+  theme_bw()
+
+
+
+### do_bottom ------------------------------------------
+do_bottom <- do %>%
+  ungroup() %>%
+  group_by(YEID, Year) %>%
+  slice(which.max(Depth))
+length(unique(do_bottom$YEID))
+length(unique(do$YEID))
+
+
+
+s1 <- do_bottom %>% group_by(Year) %>% tally()
+s2 <- do_bottom %>% dplyr::filter(nchar(YEID) < 10) %>% group_by(Year) %>% tally()
+cbind(s1, s2$n)
+
+
+fname <- paste0(dir.do, 'sample_2000_2019_do_bottom.xlsx'); #fname
+writexl::write_xlsx(x = do_bottom, path = fname)
+```
+
+
+
+```{r data desc - temporal}
+
+library("wesanderson")
+
+### this is hard to see the trend
+do_bottom %>%
+  # dplyr::filter(nchar(YEID) < 10) %>%   ## ----> optional !!!!
+  ggplot(aes(x = Date, y = DO)) +
+  geom_point() +
+  theme_bw()
+
+### perhaps to look at several sub-regions, using fishnet?
+do_bottom %>%
+  # dplyr::filter(nchar(YEID) < 10) %>%
+  ungroup() %>%
+  distinct(YEID, Date, .keep_all = T) %>%
+  dplyr::mutate(mm = month(Date)) %>%
+  dplyr::filter(mm <=9) %>%
+  dplyr::mutate(mm = as.factor(mm),
+                mmdd = paste(2000, month(Date), day(Date), sep = '-'),
+                mmdd = as.Date(mmdd)) %>%
+  group_by(YEID, Date, Year, mmdd, mm) %>% tally() %>%
+  as.data.frame() %>%
+  ggplot()+
+  geom_col(aes(x = mmdd, y = n, fill = mm)) +
+  scale_x_date(date_breaks = "1 month", date_labels = "%b") +
+  scale_fill_manual('Month', values = wes_palette("Zissou1")) +
+  facet_wrap(~Year) + ## , scales = 'free_x'
+  theme_bw() +
+  # theme(axis.text.x = element_text(angle = 45, hjust = 1,vjust = 0.5)) +
+  ggtitle('Number of samples by month') + 
+  ylab('Count') + xlab("Month")
+  
+
+pname <- paste0(dir.fig, 'SM_Number of samples by date_R1.png'); pname
+ggsave(filename = pname, plot = last_plot(), width = 7*1.5, height = 4*1.5, units = 'in', dpi = 300)
+
+
+
+
+### For each agency, sampling date 
+levels(do_bottom$Source)
+
+
+do_bottom %>%
+  # dplyr::filter(nchar(YEID) < 10) %>%
+  # dplyr::filter(Source == 'LUMCON') %>%
+  dplyr::filter(Source == 'SEAMAP') %>%
+  ungroup() %>%
+  distinct(YEID, Date, .keep_all = T) %>%
+  dplyr::mutate(mm = month(Date)) %>%
+  dplyr::filter(mm <=9) %>%
+  dplyr::mutate(mm = as.factor(mm),
+                mmdd = paste(2000, month(Date), day(Date), sep = '-'),
+                mmdd = as.Date(mmdd)) %>%
+  group_by(YEID, Date, Year, mmdd, mm) %>% tally() %>%
+  as.data.frame() %>%
+  ggplot()+
+  geom_col(aes(x = mmdd, y = n, fill = mm)) +
+  scale_x_date(date_breaks = "1 month", date_labels = "%b") +
+  scale_fill_manual('Month', values = wes_palette("Zissou1")) +
+  facet_wrap(~Year) + ## , scales = 'free_x'
+  theme_bw() +
+  # theme(axis.text.x = element_text(angle = 45, hjust = 1,vjust = 0.5)) +
+  ggtitle('Number of samples by month') + 
+  ylab('Count') + xlab("Month")
+```
+
+
+
+```{r data desc - spatial}
+### this is hard to see the trend
+do_bottom %>%
+  dplyr::filter(nchar(YEID) < 10) %>%
+  # dplyr::filter(Year == 2014) %>%
+  ggplot(aes(x = lon, y = lat, color = DO)) +
+  geom_point(size = 0.5, alpha = 0.8) +
+  scico::scale_color_scico(palette = "roma") +
+  facet_wrap(~Year) +
+  theme_bw() +
+  ggtitle('Bottom DO map') +
+  theme(panel.grid.minor = element_blank(), legend.position = 'bottom')
+
+fname <- paste0(dir.fig, 'sample_map_do_bottom.png'); fname
+ggsave(filename = fname, plot = last_plot(), width = 8, height = 6, units = 'in', dpi = 300)
+```
+

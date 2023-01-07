@@ -1,0 +1,620 @@
+---
+title: "Untitled"
+author: "Yingjie"
+date: "11/1/2021"
+output: html_document
+editor_options: 
+  chunk_output_type: inline
+---
+
+
+
+# Package
+```{r}
+remove(list = ls())
+
+library(readr)
+library(lubridate)
+library(tidyverse)
+library(cowplot)
+
+## DF to Raster
+library(sp)
+library(sf)
+library(raster)
+
+
+## Plot maps
+library(tmap)
+library(RColorBrewer)
+library(grid)      ## put plots in a panel
+library(paletteer) ##
+
+
+## a function to only keep 'dead zone' cells, while remove all other cells
+func_dz_raster <- function(r){
+  r[r > 2]  <- NA
+  r[r <= 2] <- 1    ## 
+  return(r)
+}
+
+
+
+## versions of revision 
+postfix <- ""     ## first submission
+# postfix <- "_R1"  ## first revision
+```
+
+
+
+
+
+# Data
+
+
+```{r - Load RF area data}
+
+list.files(path = './data/results_RF', pattern = '^area', full.names = T)
+
+## temporal change of dz area in 2014 ----------------------------------------------------
+# csv <- "./data/results_RF/area_byYear2010_2019_Jul_Sep.csv"
+csv <- './data/results_RF/area_byYear2010_2019_Jun_Sep.csv'
+csv <- './data/results_RF/area_byYear2000_2019_Jun_Sep.csv'
+
+area_dz_rf <- read_csv(csv) %>%
+  rename_at(vars(starts_with("system")), ~'date') %>%
+  dplyr::rename(area = Area) %>%
+  dplyr::mutate(date = as.Date(date, "%B %d, %Y"), 
+                year = lubridate::year(date),
+                doy  = yday(date),
+                time = as.Date(doy, origin = '2009-12-31'),
+                model = 'RF') %>%
+  dplyr::select(model, date, area, everything())
+```
+
+
+
+
+
+
+#  Plot Area time series
+
+## - by year by month
+  * The data is analyzed and downloaded from GEE `03_DZ_stat`
+```{r}
+
+(
+  p1 <- 
+    ggplot(data = area_dz_rf, aes(x = time, y = area/1000)) +
+    geom_point(aes(color = area), alpha = 1, shape = 16, size = 0.5) +
+    geom_smooth(method = 'loess', formula = 'y ~ x', color = 'gray40', 
+                # span = 0.25,
+                span = 0.5,
+                # se=F, 
+                alpha = 0.4, size = 0.1) +
+    # geom_rect(
+    #     data = data.frame(year = factor(c('2010'))), ## not to add 'rect' for FDA
+    #     aes(x = NULL, y = NULL, 
+    #         xmin=as.Date('2010-08-15'), 
+    #         xmax=as.Date('2010-09-15'), ymin=-Inf, ymax=Inf),
+    #     fill = 'blue', alpha = 0.1) +
+  
+    
+    # geom_rect(
+    #     data = data.frame(year = factor(2010:2019)), ## not to add 'rect' for FDA
+    #     aes(x = NULL, y = NULL, 
+    #         xmin=as.Date('2010-09-01'), 
+    #         xmax=as.Date('2010-09-15'), ymin=-Inf, ymax=Inf),
+    #     fill = 'blue', alpha = 0.1) +
+    
+    facet_wrap(~year, ncol = 5) +
+    scale_color_distiller(type = 'seq', palette = 'OrRd', direction = 1) + # YlOrRd; Oranges; OrRd; Reds
+    scale_x_date(date_labels = "%m") +  ## see more `?strptime`
+    scale_y_continuous(limits = c(0, 19)) +
+    ylab(expression("Area ("~10^3~km^2~")"))+ xlab('Month') +
+    geom_vline(xintercept = as.Date('2010-08-01'), size = 0.2, color = 'gray', linetype = 'dashed') +
+    geom_hline(yintercept = 5, size = 0.5, color = 'red', linetype = 'dashed', alpha = 0.6) +
+    theme_bw() +
+    theme(legend.position = "none", 
+          panel.grid = element_line(size = 0.4),
+          panel.grid.minor = element_blank())
+)
+fname <- paste0('./figures/', 'area_dz_byMonth_Span0.5.png'); fname
+ggsave(filename = fname, plot = p1, width = 6.4, height = 3*2, units = 'in', dpi = 300)
+
+
+
+summary(area_dz_rf$area)
+
+
+# July 26 - August 3
+area_dz_rf %>% 
+  dplyr::filter(date >= as.Date('2014-07-19'), 
+                date <= as.Date('2014-08-15')) %>%
+  summary()
+  
+```
+
+
+
+```{r eval=FALSE, include=FALSE}
+library(plotly)
+ggplotly(p1)
+```
+
+
+
+## - by year
+
+  To get the *max* extent in each year
+  
+  To also plot the *mean* and *sd* during what time window? 
+  
+```{r }
+
+area_Nancy <- readxl::read_excel(path = './data/gulfhypoxia_area_1985-2021.xlsx') %>%
+  dplyr::select(1:2) %>%
+  dplyr::rename(km2 = `Square Kilometers`) %>%
+  dplyr::mutate(km2 = as.numeric(km2)) %>%
+  dplyr::filter(Year >= 2000, Year <= 2019) %>%
+  as.data.frame()
+names(area_Nancy) <- c('year', 'area')
+  
+
+area_dz_rf2 <- area_dz_rf %>%
+  dplyr::select(-time) %>% ## this is a fake time for plotting
+  dplyr::filter(lubridate::month(date) >= 7, 
+                lubridate::month(date) <= 9) %>%
+  dplyr::filter(area > 3000) %>%
+  group_by(model, year) %>%
+  arrange(desc(area)) %>%
+  dplyr::mutate(n = n()) %>%
+  slice_max(n = 10, order_by = area) %>%
+  dplyr::mutate(n2 = n()) %>%
+  as.data.frame()
+
+str(area_dz_rf2)
+
+data_summary <- function(data, varname, groupnames){
+  require(plyr)
+  summary_func <- function(x, col){
+    c(mean = mean(x[[col]], na.rm=TRUE),
+      # mean = median(x[[col]], na.rm=TRUE),
+      sd = sd(x[[col]], na.rm=TRUE))
+  }
+  data_sum <- ddply(data, groupnames, .fun=summary_func, varname)
+  data_sum <- rename(data_sum, c("mean" = varname))
+ return(data_sum)
+}
+
+
+
+df2 <- data_summary(area_dz_rf2, varname ="area", 
+                    groupnames=c("year", "model"))
+# Convert dose to a factor variable
+# df2$dose=as.factor(df2$dose)
+head(df2)
+
+
+
+### average size during 2009-2019
+df2 %>%
+  dplyr::filter(year > 2008) %>%
+  data_summary(., varname ="area", groupnames=c("model"))
+
+
+
+(
+p<- ggplot(data = df2, aes(x=year, y=area, fill=area)) + 
+    geom_bar(stat="identity", 
+             # width = .8,
+             # color="black", 
+             position=position_dodge(), show.legend = F) +
+    geom_errorbar(aes(ymin=area-sd, ymax=area+sd), width=.2,
+                  position=position_dodge(.8)) + 
+    scale_fill_distiller(palette = 'Reds', direction = 1) +
+    scale_x_continuous(breaks = seq(2000, 2019, 1)) +
+    geom_hline(yintercept = 5000, linetype = 'dashed', color = 'red',  alpha = .7) + 
+    annotate(geom="text", x=2018, y=5000-900, 
+             label= "Hypoxia Action Plan Goal\n(<5000)", alpha = .7, size = 3, color = 'red') +
+    
+    geom_point(data = area_Nancy, aes(x=year, y = area), alpha = .2, size = 2.5, shape = 16) +
+    # geom_text(x=2018, y=20000, label="by Rabalais et al") +
+    annotate(geom="text", x=2015, y=20000-1000, label="by Rabalais et al", alpha = .4, size = 3) +
+    annotate(geom = "segment", x = 2015.5, xend = 2017-.2, y = 20000-500, yend = 20000 + 2300, 
+             arrow = arrow(#type = 'closed', 
+                           length = unit(0.015, "npc")), 
+             # size = .5,
+             # colour = "blue", 
+             alpha = .3) +
+    
+    geom_line(data  = area_Nancy, aes(x=year, y = area), alpha = .2) +
+    ylab(expression("Area ("~km^2~")"))+ xlab('Year') +
+    theme_bw() +
+    theme(axis.text.x = element_text(angle = 45, hjust = 1,vjust = 1)) +
+    theme(legend.position = "none", 
+          panel.grid = element_line(size = 0.1),
+          panel.grid.minor = element_blank())
+)
+
+fname <- paste0('./figures/', 'area_dz_byYear.png'); fname
+ggsave(filename = fname, plot = p, width = 7, height = 5, units = 'in', dpi = 300)
+```
+
+
+
+
+
+# Maps
+
+## - data
+
+```{r}
+## get the raster file list
+dir.freq <- "./data/results_RF/dz_frequency_2000_2019/"
+ras_ls <- list.files(path = dir.freq, pattern = "^dz_frequency_", full.names = T)
+
+
+## read in one file
+yr <- 2000
+ras <- paste0(dir.freq, 'dz_frequency_', yr, '.tif'); ras
+ras <- raster(ras)
+ras[ras <= 0] <- NA
+ras_crs <- crs(ras)
+
+crs(ras)
+# st_crs(ras)
+
+## to get a boundary box 
+bb <- st_bbox(ras, crs = crs(ras));  ## , crs = st_crs(4326)
+bb
+## change projection to get the lat and lon
+bb_ll = st_bbox(st_transform(x = st_as_sfc(bb), crs = 4326)) 
+bb_ll
+## crop the box or reduce the focus region for plotting
+bb_ll['ymin'] <- 27
+bb_ll[2]
+
+## change back to the original projection
+bb2 <- st_bbox(st_transform(x = st_as_sfc(bb_ll), crs = crs(ras)))
+bb2
+bb
+
+## to generate sfc file 
+bb_sf <- st_as_sfc(bb2)
+bb_sf <- st_transform(bb_sf, crs = 4326)
+
+
+
+
+
+
+
+
+
+rivers <- '../Dead_Zone_telecoupling/data/shp/TWAP_rivers.shp'
+riv <- st_read(rivers) %>% st_as_sf() %>% 
+  dplyr::select(name) %>%
+  dplyr::rename(river_name = name)
+shp <- 'D:/data/shp/NaturalEarthData/ne_50m_admin_1_states_provinces/ne_50m_admin_1_states_provinces.shp'
+usa <- sf::st_read(shp) %>%
+  st_as_sf() %>%
+  dplyr::filter(adm0_a3 == 'USA') %>%
+  dplyr::select(name)
+# st_crs(usa)
+# st_crs(bb_sf)
+# st_crs(bb)
+# usa_gulf <- st_crop(usa, bb_sf)
+
+riv_cropped <- st_crop(riv, bb_sf)
+riv_cropped_simp <- st_simplify(x = riv_cropped)
+# plot(riv_cropped)
+# plot(riv)
+plot(riv_cropped_simp)
+```
+
+
+```{r eval=FALSE, include=FALSE}
+### test code -----------------------------
+dz_freq <- 
+  tm_shape(ras, bbox = bb_sf) +
+  # tm_shape(ras) +
+  tm_raster(style = "fixed", title = "(%)",
+            breaks = c(0, 10, 25, 50, 60, Inf), 
+            # legend.hist = TRUE,
+            palette = paletteer_c("grDevices::YlOrRd", 5, direction = -1)[2:5])+ ## terrain.colors(5) ## viridis::inferno
+  # tm_legend(outside = TRUE, hist.width = 2) +
+  # tm_scale_bar(position = c(0.2, .005), size=.8, text.color = 'white')+
+  tm_shape(usa) + 
+  tm_polygons(col = "gray95",  border.col = "gray60", legend.show=F) +
+  tm_text("name", col = 'gray60', fontface = 'bold', auto.placement = T, remove.overlap = T) +
+  tm_shape(riv) + tm_lines(col = "royalblue1", lwd = 1.5, legend.col.show = F, legend.lwd.show = F) +
+  tm_layout(
+    title = yr, title.position = c(0.01, 0.95),
+    legend.position= c(0.001, 0.001), 
+    # bg.color = 'black', legend.text.color = 'white', legend.title.color= 'white',
+    # bg.color = 'white', 
+    legend.bg.color = 'white', legend.bg.alpha = 0.5,
+    legend.text.color = 'black', legend.title.color= 'black')
+dz_freq
+
+## save plot
+# tmap_save(dz_freq, filename="./figures/dz_freq.png", height=3, width=7, units="in", dpi=300)
+
+```
+
+
+
+
+##  - by year
+```{r}
+counter = 0
+for (i in 1:length(ras_ls)) {
+  r <- ras_ls[i]
+  ras <- raster(r)
+  ras[ras <= 0] <- NA
+  
+  ## this will be used to determine if to add a legend --> only add a legend to the 1st map
+  counter = counter + length(r); #print(counter)
+  yes_or_no <- if(counter < 2) 1 else 0
+  print(yes_or_no)
+  
+  date_ini <- basename(r) %>% gsub('dz_frequency_|\\.tif', '', .)
+  yr       <- date_ini %>% gsub('-', '', .) %>% as.numeric(); print(yr)
+  map_nm   <- paste0('dz_frequency_', yr)
+  
+  ### which plot to add the legend?
+  add_legend = ifelse(yr == 2019, TRUE, FALSE)
+  
+
+  dz_freq <- 
+    tm_shape(ras, bbox = bb_sf) +
+    # tm_shape(ras) +
+    tm_raster(style = "fixed", title = "(%)",
+              # breaks = c(0, 10, 25, 50, 60, Inf), 
+              breaks = c(seq(0, 60, 20), Inf), 
+              legend.show = add_legend,
+              # legend.hist = TRUE,
+              palette = paletteer_c("grDevices::YlOrRd", 6, direction = -1)[1:4])+ ## terrain.colors(5) ## viridis::inferno
+    # tm_legend(outside = TRUE, hist.width = 2) +
+    # tm_scale_bar(position = c(0.2, .005), size=.8, text.color = 'white')+
+    tm_shape(usa) + 
+    tm_polygons(col = "gray95",  border.col = "gray60", lwd = .2, legend.show=F) +
+    # tm_text("name", col = 'gray60', fontface = 'bold', size = .5, auto.placement = T, remove.overlap = T) +
+    tm_shape(riv_cropped) + tm_lines(col = "royalblue1", lwd = .2, legend.col.show = F, legend.lwd.show = F) +
+    tm_layout(
+      title = yr, title.position = c(0.01, 0.9), title.size = .5, 
+      legend.position= c(0.8, 0.001), 
+      # bg.color = 'black', legend.text.color = 'white', legend.title.color= 'white',
+      bg.color = 'white', frame.lwd = .5,
+      legend.bg.color = 'white', legend.bg.alpha = 0.5, 
+      legend.text.size = .4, legend.title.size = .5, outer.margins = 0, inner.margins = 0, between.margin = 0,
+      legend.text.color = 'black', legend.title.color = 'black')
+
+
+  assign(map_nm, dz_freq)
+
+}
+
+
+map_ls <- mget(ls(pattern = 'dz_frequency_')) ## 4, 5
+# map_ls <- map_ls[1:4] ## test use
+
+nn <- length(map_ls)
+ncols = 3 ## 5, 3
+nrows = ceiling(nn/ncols)
+
+source('./Code/func_map_arrange_ncol.R')
+fname <- paste0('./figures/dz_frequency_crop_', ncols, 'ncols2.png'); fname
+h = 2.3    # before crop
+h = 1.843  # after crop
+func_map_arrange_ncol(plot_list = map_ls, n_plots = nn, h = h,
+                      # ncols = 2, nrows = 2, ## test use
+                      ncols = ncols, nrows = nrows,
+                      filename = fname)
+```
+
+
+
+
+
+```{r - area_over_half_occurrance_yrs}
+area_over_half_occurrance_yrs <- data.frame()
+
+for (i in 1:length(ras_ls)) {
+  r <- ras_ls[i]
+  ras <- raster(r)
+  # ras[ras <  50] <- NA
+  # ras[ras >= 50] <- 1
+  plot(ras)
+  yr <- as.numeric(gsub("\\D", "", x = basename(r)))
+
+
+  # sum(ras[] >= 50 & ras[] <= 100, na.rm = T)
+  area_over_half_occurrance <- sum(ras[] >= 60 & ras[] <= 100, na.rm = T) * res(ras)[1]^2/1000^2
+  area_over_half_occurrance <- cbind(year = yr, area = area_over_half_occurrance)
+  area_over_half_occurrance_yrs <- rbind(area_over_half_occurrance_yrs, area_over_half_occurrance)
+
+}
+```
+
+
+```{r}
+area_over_half_occurrance_yrs %>%
+  ggplot(aes(x = year, y = area)) +
+  geom_point(color = '#EF7000FF') +
+  geom_line(color = '#EF7000FF') +
+  scale_x_continuous(breaks = seq(2000, 2019, 1)) +
+  scale_y_continuous(breaks = seq(0, 18000, 2500)) +
+  geom_hline(yintercept = 5000, linetype = 'dashed', color = 'red',  alpha = .7) + 
+  theme_bw() +
+  ylab(expression("Area ("~km^2~")"))+ xlab('Year') +
+  annotate(geom="text", x=2000, y=15000, label="Area with over 60% occurrence each summer", hjust = 0.08, size = 5, color = '#EF7000FF') +
+  theme_bw() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1,vjust = 1)) +
+  theme(legend.position = "none", plot.margin = margin(0, 0, 0, 0, "cm"),
+        panel.grid = element_line(size = 0.1),
+        panel.grid.minor = element_blank())
+
+fname <- paste0('./figures/', 'area_dz_over_60pct_occurrence_byYear.png'); fname
+ggsave(filename = fname, plot = last_plot(), width = 9, height = h/7*9, units = 'in', dpi = 300)
+```
+
+
+
+## - occurance over 20 years
+```{r}
+
+func_dz_occur_year <- function(file) {
+  ras <- raster(x = file)
+  ras[ras <= 0] <- 0
+  ras[ras >  0] <- 1
+  return(ras)
+}
+
+
+dz_yr <- 0
+for (i in 1:length(ras_ls)) {
+  ras   <- func_dz_occur_year(file = ras_ls[i])
+  dz_yr <- dz_yr + ras
+}
+
+dz_yr_freq <- (dz_yr/length(ras_ls))*100
+dz_yr_freq[dz_yr_freq <= 0] <- NA ## for better viz
+plot(dz_yr_freq)
+
+
+
+ras <- dz_yr_freq
+dz_freq_yr <-
+  tm_shape(ras, bbox = bb_sf) +
+  # tm_shape(ras) +
+  tm_raster(style = "fixed", title = "(%)",
+            # breaks = c(0, 10, 25, 50, 60, 80, 100, Inf), 
+            breaks = c(seq(0, 100, 20), Inf), 
+            labels = c('0 to 20', '20 to 40', '40 to 60', '60 to 80', '80 to 100', '100'),
+            # legend.show = add_legend,
+            # legend.hist = TRUE,
+            palette = paletteer_c("grDevices::YlOrRd", 6, direction = -1))+ 
+  tm_shape(usa) + 
+  tm_polygons(col = "gray95",  border.col = "gray60", lwd = .2, 
+              legend.show=F) +
+  # tm_text("name", col = 'gray60', fontface = 'bold', size = .5, auto.placement = T, remove.overlap = T) +
+  tm_shape(riv_cropped_simp) + tm_lines(col = "royalblue1", lwd = .2, legend.col.show = F, legend.lwd.show = F) +
+  tm_text(text = "river_name", col = 'royalblue2', 
+          along.lines = T, group = "river_name", 
+          xmod = .35, ymod = .25,
+          # just = 1,
+          # auto.placement = T,
+          remove.overlap = F, 
+          size = 0.4, alpha = .6) +
+    tm_layout(
+      title = '2000-2019',
+      title.position = c(0.01, 0.92), title.size = .7, title.color = 'gray30',
+      legend.position= c(0.01, 0.001), 
+      bg.color = 'white', 
+      # frame.lwd = .5, #frame = F,
+      legend.bg.color = 'white', legend.bg.alpha = 0.5,  
+      # legend.text.size = .4, legend.title.size = .5, 
+      outer.margins = 0, inner.margins = 0, between.margin = 0,
+      legend.text.color = 'black', legend.title.color = 'black')
+dz_freq_yr
+    
+fname <- paste0('./figures/dz_freq_yr', '.png'); fname
+tmap_save(tm = dz_freq_yr, filename = fname, width = 7, height = h, units="in", dpi = 300)
+```
+
+
+
+
+## - example DO maps
+
+```{r}
+bg_color = 'gray10'  ## gray, as NA
+
+
+dir_do_tif <- './data/results_RF/dz_predicted_maps/'
+r_ls <- list.files(path = dir_do_tif, pattern = 'tif$', full.names = T)
+
+
+for (r in r_ls) {
+  
+  # r  <- paste0(dir_do_tif, '2019-07-30.tif')
+  do <- raster(r) 
+  ras_name <- gsub('\\.tif', '', basename(r))
+  do_map <-
+      tm_shape(do, bbox = bb_sf) +
+      tm_raster(style = "fixed", title = "DO (mg/l)", showNA = T, colorNA = bg_color, textNA = "NA",
+                breaks = seq(0, 8, 2), legend.reverse = F, legend.is.portrait = T,
+                palette = brewer.pal(9,"RdYlBu"), legend.show = 1) +  ## legend.show = yes_or_no
+      tm_shape(usa) + tm_polygons(col = "gray95", 
+                                  lwd = .2, 
+                                  border.col = NA, legend.show=F)+
+      tm_layout(bg.color = bg_color, legend.height = 1, #legend.width = .3, #legend.text.size = 1.5, legend.title.size = 1.5, 
+                legend.bg.color = 'black', legend.bg.alpha = 0.5, #legend.text.size = 2, 
+                outer.bg.color = 'white', frame = T,
+                legend.text.color = 'white', legend.title.color= 'white', 
+                title = ras_name, title.position = c(0.01, 0.92), title.size = 0.8,
+                outer.margins = 0, inner.margins = 0, between.margin = 0,
+                legend.position= c(0.0, 0.0))
+    
+  print(domap)
+  # Sys.sleep(2) ## in seconds
+    
+  fname <- paste0('./figures/do_map/do_map_', ras_name, '.png'); fname
+  tmap_save(tm = do_map, filename = fname, width = 7, height = h, units="in", dpi = 300)
+  
+}
+
+```
+
+
+
+
+
+# TO DO
+
+```{r - Report the peak area in MS, eval=FALSE, include=FALSE}
+###
+
+summary(area_dz_10d_3model$area)
+
+
+### filter the time range when dz peaks
+area_dz_10d_3model_peak <- area_dz_10d_3model %>%
+  dplyr::filter(date >= as.Date('2014-07-15'), date <= as.Date('2014-08-15')) 
+
+
+# x <- area_dz_10d_3model_peak$area
+# x[!x %in% boxplot.stats(x)$out]
+
+
+### get the summary info 
+area_dz_10d_3model_peak_sm <- area_dz_10d_3model_peak %>%
+  arrange(model, desc(area)) %>%
+  group_by(model) %>%
+  dplyr::summarise(mean = mean(area, na.rm = T), 
+                   # median = median(area, na.rm = T), 
+                   sd  = sd(area, na.rm = T),
+                   max = max(area, na.rm = T)) %>%
+  as.data.frame()
+area_dz_10d_3model_peak_sm
+
+### the average dz size across 3 models, and the sd, se
+mean(area_dz_10d_3model_peak$area)
+sd(area_dz_10d_3model_peak$area)
+se <- function(x) sd(x)/sqrt(length(x))
+se(area_dz_10d_3model_peak$area)
+
+
+### to use this package to get the same information 
+Rmisc::summarySE(data = area_dz_10d_3model_peak, measurevar="area")
+Rmisc::summarySE(data = area_dz_10d_3model_peak, measurevar="area", groupvars=c("model"))
+  
+
+### similar as `Rmisc::summarySE`
+psych::describeBy(x = area_dz_10d_3model_peak %>% dplyr::select(-date), group="model", mat = T, digits = 2)
+```
+
+
+

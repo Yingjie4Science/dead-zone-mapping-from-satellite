@@ -13,7 +13,7 @@ https://cran.r-project.org/web/packages/randomForest/randomForest.pdf
 
 # Set up
 
-```{r Packages and Dirs}
+```{r Packages and Dirs, include=FALSE}
 # To clear your environment
 remove(list = ls())
 
@@ -22,6 +22,7 @@ library(tidyverse)
 require(hydroGOF)    ## for calculating RMSE and MAE
 
 
+library(ggpmisc)     ## add formula to fitted  plot
 library(cowplot)
 library(ggpubr)
 
@@ -38,10 +39,11 @@ getwd()
 dir.band    <- paste0(dir.root, '/data/from_gee/')
 dir.fig     <- paste0(dir.root, '/figures/');   dir.fig
 dir.cleaned <- paste0(dir.band, 'Img2Table_cleaned/'); dir.cleaned
+dir.sample  <- paste0(dir.band, 'rs_do_sample/');
 
 ## keep more decimals
-options(digits = 15)
-options(pillar.sigfig = 15)
+options(digits = 8)
+options(pillar.sigfig = 8)
 
 ### Disable Scientific Notation in R
 options(scipen = 999) # Modify global options in R
@@ -121,66 +123,107 @@ func_accuracy_metrics <- function(predicted, actual){
 
 
 
-# Data
+# RF
 
-```{r}
+## 1. Test RF on one lag
+
+```{r - Data, include=FALSE}
 # xls <- "sample_2005to2019_pixelValue_withDObottom_1_weekBefore.xlsx" ## old file name
-xls <- "RS_do_bottom_sample_2000_2019_1x10daysBefore.xlsx"
-xls <- "RS_do_bottom_sample_2000_2019_1x7daysBefore.xlsx"
+# xls <- "RS_do_bottom_sample_2000_2019_1x7daysBefore.xlsx"
+# xls <- "RS_do_bottom_sample_2000_2019_1x10daysBefore.xlsx"           ## 2021-11-01; mean R2 = 0.66
+xls <- "RS_do_bottom_sample_2000_2019_10x1daysBefore_mean.xlsx"    ## 2022-05-10; mean R2 = 0.56
+# xls <- "RS_do_bottom_sample_2000_2019_11x1daysBefore_median.xlsx"  ## 2022-05-10
 
-fname <- paste0(dir.cleaned, xls); fname
+fname <- paste0(dir.sample, 'rs_do_sample_lagByNDay/', xls); fname
 
 df <- readxl::read_excel(path = fname) %>%
   dplyr::filter(year == 2014) %>%
-  dplyr::filter(nchar(YEID) <= 10) %>%
+  # dplyr::filter(nchar(YEID) <= 10) %>%
   dplyr::rename(station = YEID, oxmgl = DO) %>%
   as.data.frame()
 
 names(df)
 
-### aggregate by the mean value of all the bands for each station
-xmean <- aggregate(df[, 4:17], by=list(df$station), FUN=mean, na.rm=T)
-### aggregate by the mean value of the DO data for each station
-ymean <- aggregate(df$oxmgl,   by=list(df$station), FUN=mean, na.rm=T)
 
-xvar <- xmean[,-1] ## remove the column of station id 
-yvar <- ymean[,-1]
+
+## variables as input --------------------------------------------------------------------
+
+### --> first test these 14 variables used before
+var_included <- 
+  c("chlor_a", "nflh", "poc", "Rrs_412", "Rrs_443", "Rrs_469", "Rrs_488",
+    "Rrs_531", "Rrs_547", "Rrs_555", "Rrs_645", "Rrs_667", "Rrs_678","sst")
+
+
+### --> then will include all other variables into analysis
+# var_included <- !names(df) %in% 
+#   c("nweek_before", "station", "year", "Year", "oxmgl", "Depth", 
+#     "Temp", "Salin", "Source", "lat", "lon", "yy", "mm")
+  
+
+cat('In total,', length(var_included), 'variables are included for analysis.')
+
+
+### aggregate by the mean value of all the bands for each station, in case any duplicated information 
+x <- aggregate(df[, var_included], by=list(df$station), FUN=mean, na.rm=T)
+### aggregate by the mean value of the DO data for each station
+y <- aggregate(df$oxmgl,   by=list(df$station), FUN=mean, na.rm=T)
+
+xvar <- x[,-1] ## remove the column of station id 
+yvar <- y[,-1]
 
 rf.data <- cbind(yvar, xvar) ## put y and x(s) in one table 
-str(rf.data)
-rf.data.na.omit <- na.omit(rf.data)
+# skimr::skim(rf.data)
 
-## >> to choose input data ---------------------------------
+## --> do we need to omit NA from the data? 
+# rf.data.na.omit <- na.omit(rf.data)
+
+## --> to choose input data ---------------------------------
 data <- rf.data
 # data <- rf.data.na.omit
 
 ```
 
 
-```{r band colors}
+```{r - Band colors, include=FALSE}
 names(xvar)
 # colors <- c("chlor_a", "nflh",    "poc",     "Rrs_412", "Rrs_443", "Rrs_469", "Rrs_488", 
 #             "Rrs_531", "Rrs_547", "Rrs_555", "Rrs_645", "Rrs_667", "Rrs_678", "sst")
 color_non <- 'gray50'
-colors <- c(color_non, color_non, color_non, "#9ecae1", "#9ecae1", "#1f78b4", "#1f78b4", 
+
+## if use part of the band variables, define the color; otherwise, use one color for all at this moment. 
+
+if ( length(names(xvar)) < 15) {
+  
+  colors <- c(color_non, color_non, color_non, "#9ecae1", "#9ecae1", "#1f78b4", "#1f78b4", 
             "#33a02c", "#33a02c", "#33a02c", "#fdbf6f", "#fdbf6f", "#fdbf6f", color_non)
-names(colors) <- names(xvar)
+  names(colors) <- names(xvar)
+  
+} else {
+  
+  colors <- rep(x = color_non, length(names(xvar)) )
+  names(colors) <- names(xvar)
+}
+
 
 colors
 ```
 
 
+```{r - RF para}
+
+n_tree <- 99  ## It is suggested that an odd number of `ntree` would be more ideal, as ties can be broken.
 
 
-# RF model
 
-## 1. RF - choose time lag
+percent_for_training <- 0.7
+# percent_for_training <- 0.8
+```
 
-### 1.1. all samples as the training set
-```{r}
+
+```{r - 1. RF use all samples as the training set, eval=FALSE, include=FALSE}
 data_train <- data
 
-n_tree <- 100 ## 99
+
 rf.model <- randomForest(yvar ~ ., data = data_train, ntree = n_tree, 
                          importance = TRUE, norm.votes = TRUE, proximity = TRUE, 
                          # mtry  = 8, ## --> need to use RF tune process to decide
@@ -203,19 +246,17 @@ func_accuracy_metrics(predicted = predict_train, actual = data_train$yvar)
 ```
 
 
-### 1.2. 70% for training, and 30% for testing
-```{r}
+
+
+```{r - 2. RF use 70% for training 30% for testing}
 
 ### 70% date for training, 30% for testing
 # set.seed(123)
-train <- sample(nrow(data), nrow(data)*0.7)
+train <- sample(nrow(data), nrow(data)*percent_for_training)
 data_train <- data[train, ]
 data_test  <- data[-train, ]
 
 
-
-# RF model -------------------------------------------------------------------------------
-## run rf model 
 rf.model <- randomForest(yvar ~ ., data = data_train, ntree = n_tree, 
                          importance = TRUE, norm.votes = TRUE, proximity = TRUE, 
                          # mtry  = 8, ## --> need to use RF tune process to decide
@@ -228,91 +269,38 @@ attributes(rf.model)
 
 plot(rf.model)
 
+```
+
+
+
+
+```{r - 3. Plot obs-predict}
+
+
 # 1. accuracy using training dataset 
 predict_train <- predict(rf.model, data_train)
-plot(data_train$yvar, predict_train, main = 'Training sample', xlab = 'obs', ylab = 'Predict')
-abline(0, 1) ## abline(0,1) will draw a 1:1 line
-
-
 # 2. accuracy using testing dataset 
-predict_test <- predict(rf.model, data_test)
-plot(data_test$yvar, predict_test, main = 'Testing sample', xlab = 'obs', ylab = 'Predict')
-abline(0, 1)
+predict_test  <- predict(rf.model, data_test)
+
+
+
+### plot use base R ----------------------------------------------------------------------
+# plot(data_train$yvar, predict_train, main = 'Training sample', xlab = 'obs', ylab = 'Predict')
+# abline(0, 1) ## abline(0,1) will draw a 1:1 line
+# 
+# plot(data_test$yvar, predict_test, main = 'Testing sample', xlab = 'obs', ylab = 'Predict')
+# abline(0, 1)
 
 # Calculating RMSE using rmse()         
 func_accuracy_metrics(predicted = predict_train, actual = data_train$yvar)
 func_accuracy_metrics(predicted = predict_test,  actual = data_test$yvar)
-```
-
-
-
-```{r - loop 1000 times}
-acc_training <- data.frame()
-acc_testing  <- data.frame()
-
-for (i in 1:1000) {
-  print(i)
-  
-  # set.seed(999)
-  train <- sample(nrow(data), nrow(data)*0.7, replace = F)
-  data_train <- data[train, ]
-  data_test  <- data[-train, ]
-  
-  
-  
-  # RF model 
-  n_tree <- 100 ## 99
-  rf.model <- randomForest(yvar ~ ., data = data_train, ntree = n_tree, 
-                           importance = TRUE, norm.votes = TRUE, proximity = TRUE, 
-                           # mtry  = 8, ## --> need to use RF tune process to decide
-                           na.action = na.omit) 
-
-  
-  # 1. accuracy using training dataset 
-  predict_train <- predict(rf.model, data_train)
-  # 2. accuracy using testing dataset 
-  predict_test <- predict(rf.model, data_test)
-  
-  # Calculating RMSE using rmse()         
-  # acc <- func_accuracy_metrics(predicted = predict_train, actual = data_train$yvar)
-  # acc <- cbind(id = i, acc)
-  # acc_training <- rbind(acc_training, acc)
-  
-  acc <- func_accuracy_metrics(predicted = predict_test,  actual = data_test$yvar)
-  acc <- cbind(id = i, acc)
-  acc_testing  <- rbind(acc_testing, acc)
-  
-}
-
-hist(acc_testing$RMSE)
-
-mean(acc_testing$RMSE) %>% round(digits = 3)
-(quantile(acc_testing$RMSE, c(.25, .75)) - mean(acc_testing$RMSE)) %>% round(digits = 3)
-
-mean(acc_testing$MAE) %>% round(digits = 3)
-(quantile(acc_testing$MAE, c(.25, .75)) - mean(acc_testing$MAE)) %>% round(digits = 3)
-
-library(dplyr)
-acc_testing %>%
-  gather(key = 'error', value = 'value', 2:4) %>%
-  dplyr::mutate(error = factor(error, levels = c('R2', 'MAE', 'RMSE'))) %>%
-  ggplot(aes(x = error, y = value, fill = error)) +
-  geom_boxplot(show.legend = F) +
-  theme_bw() +
-  theme(axis.title.x = element_blank()) +
-  ggtitle('RF Testing')
-
-fname <- paste0(dir.fig, 'p2_rf_testing_accuracy1000run2.png'); fname
-ggsave(filename = fname, plot = last_plot(), width = 6.5/2, height = 3.2, units = 'in', dpi = 300)
-  
-```
 
 
 
 
 
-```{r - plot obs-predict}
-library(ggpmisc)
+### plot use ggplot() --------------------------------------------------------------------
+
 my.formula <- y ~ x
 
 ### plot for `predicted` vs. `actual`
@@ -335,6 +323,7 @@ func_plot <- function(df) {
 
 df <- data.frame(predicted = predict_train, actual = data_train$yvar); which = 'train'
 acc1 <- func_plot(df = df)
+
 df <- data.frame(predicted = predict_test,  actual = data_test$yvar);  which = 'test'
 acc2 <- func_plot(df = df)
 
@@ -342,15 +331,89 @@ acc <- ggarrange(acc1, acc2, labels = "AUTO")
 acc
 # fname <- paste0(dir.fig, 'corr_obs_predict_', which, '.png'); fname
 fname <- paste0(dir.fig, 'p2_corr_obs_predict.png'); fname
-ggsave(filename = fname, plot = acc, width = 6.5, height = 3.2, units = 'in', dpi = 300)
+# ggsave(filename = fname, plot = acc, width = 6.5, height = 3.2, units = 'in', dpi = 300)
 
 ```
 
 
 
+  * Since the R2 for testing set varies, it can be a good idea to repeat the models and see the distribution. 
+
+```{r - 4. Test loop 1000 times}
+acc_training <- data.frame()
+acc_testing  <- data.frame()
+
+for (i in 1:100) {
+  print(i)
+  
+  # set.seed(999)
+  train <- sample(nrow(data), nrow(data)*percent_for_training, replace = F)
+  data_train <- data[train, ]
+  data_test  <- data[-train, ]
+  
+  
+  
+  # RF model 
+  n_tree <- n_tree
+  rf.model <- randomForest(yvar ~ ., data = data_train, ntree = n_tree, 
+                           importance = TRUE, norm.votes = TRUE, proximity = TRUE, 
+                           # mtry  = 8, ## --> need to use RF tune process to decide
+                           na.action = na.omit) 
+
+  
+  # 1. accuracy using training dataset 
+  predict_train <- predict(rf.model, data_train)
+  # 2. accuracy using testing dataset 
+  predict_test <- predict(rf.model, data_test)
+  
+  # Calculating RMSE using rmse()         
+  # acc <- func_accuracy_metrics(predicted = predict_train, actual = data_train$yvar)
+  # acc <- cbind(id = i, acc)
+  # acc_training <- rbind(acc_training, acc)
+  
+  acc <- func_accuracy_metrics(predicted = predict_test,  actual = data_test$yvar)
+  acc <- cbind(id = i, acc)
+  acc_testing  <- rbind(acc_testing, acc)
+  
+}
+
+# hist(acc_testing$RMSE)
+hist(acc_testing$R2)
+
+mean(acc_testing$RMSE) %>% round(digits = 3)
+(quantile(acc_testing$RMSE, c(.25, .75)) - mean(acc_testing$RMSE)) %>% round(digits = 3)
+
+mean(acc_testing$MAE) %>% round(digits = 3)
+(quantile(acc_testing$MAE, c(.25, .75)) - mean(acc_testing$MAE)) %>% round(digits = 3)
+
+
+acc_testing %>%
+  gather(key = 'error', value = 'value', 2:4) %>%
+  dplyr::mutate(error = factor(error, levels = c('R2', 'MAE', 'RMSE'))) %>%
+  ggplot(aes(x = error, y = value, fill = error)) +
+  geom_boxplot(show.legend = F) +
+  theme_bw() +
+  theme(axis.title.x = element_blank()) +
+  ggtitle('RF Testing')
+
+fname <- paste0(dir.fig, 'p2_rf_testing_accuracy1000run2.png'); fname
+# ggsave(filename = fname, plot = last_plot(), width = 6.5/2, height = 3.2, units = 'in', dpi = 300)
+  
+
+# quantile(acc_testing$R2, na.rm = T)
+median(acc_testing$R2, na.rm = T)
+mean(acc_testing$R2, na.rm = T) %>% print()
+```
+
+
+
+
+
+
+
 ## 2. RF - loop all time lag
   Loop time lags and to see which time lag predicts the best. 
-```{r loop}
+```{r loop, include=FALSE}
 
 ### -> 1. to choose which year(s)
 ### -> 2. to choose weekly data OR daily data
@@ -358,32 +421,71 @@ ggsave(filename = fname, plot = acc, width = 6.5, height = 3.2, units = 'in', dp
 
 
 
-### ---> to choose: 
+### --> For one single year -------------
 
-y1 <- 2014; y2 <- 2014
-# y1 <- 2005; y2 <- 2019
+# y <- 2000
+# y <- 2003
+# y <- 2004 ## for 2004
+# y <- 2005
+# y <- 2009 ## for 2009
+# y <- 2010
+# y <- 2011
+# y <- 2013
+y <- 2014 ## for 2014
+# y <- 2015
+# y <- 2016
+# y <- 2017
+# y <- 2018
+# y <- 2019 ## for 2019
 
+y1 <- y
+y2 <- y
+
+
+
+### --> For time-series -----------------
+### Not for now
+
+
+
+## Parameters ----------------------------------------------------------------------------
 # time_unit = 'Week'
-time_unit = '10days'
+# time_unit = '10days'
 time_unit = 'byday'
 
 
 whichDO <- 'do_bottom'
 
-n_tree <- 100
+
+n_tree  <- 99
+
+
+### --> Percent of samples for training
+percent_for_training <- 0.7
+# percent_for_training <- 0.75
+# percent_for_training <- 0.8
+
+
+
+### --> na.action
+# rf_na.action <- 'na.roughfix'
+rf_na.action <- 'na.omit'
+
+
+n_randomize <- 50 ## for each time lag, run the model for `n_randomize` times
 
 
 
 # pat <- paste0('^sample_2005to2019_pixelValue_with', whichDO) ## for paper 1
 pat <- paste0('^RS_', whichDO)
-f.list <- list.files(path = dir.cleaned, pattern = pat, full.names = T, recursive = T); f.list
+f.list <- list.files(path = dir.sample, pattern = pat, full.names = T, recursive = T); #f.list
 f.list <- f.list[grepl(x = f.list, pattern = time_unit, ignore.case = T)]; f.list
 
 accuracy_ls_train <- data.frame()
 accuracy_ls_test  <- data.frame()
 
 for (f in f.list) {
-  print(f)
+  print(basename(f))
   
   for (yr in seq(y1, y2)) {
     print(yr)
@@ -404,9 +506,9 @@ for (f in f.list) {
     
     ### 2. randomize 1000 times ------------------
     ### 70% date for training, 30% for testing
-    for (i in 1:10) { ## 100
+    for (i in 1:n_randomize) { ## 100
       print(i)
-      train <- sample(nrow(data), nrow(data)*0.7)
+      train <- sample(nrow(data), nrow(data)*percent_for_training)
       data_train <- data[train, ]
       data_test  <- data[-train, ]
       

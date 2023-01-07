@@ -1,0 +1,773 @@
+---
+output: html_document
+editor_options: 
+  chunk_output_type: inline
+---
+
+
+
+
+**randomForest**
+https://cran.r-project.org/web/packages/randomForest/randomForest.pdf
+
+
+# Set up
+
+```{r Packages and Dirs}
+# To clear your environment
+remove(list = ls())
+
+library(readxl)
+library(dplyr)
+library(randomForest)
+require(hydroGOF)    ## for calculating RMSE and MAE
+
+
+## for visulization 
+library(cowplot)
+library(ggpubr)
+
+
+### Set work dir ----------------------------------------------------------
+path <- rstudioapi::getSourceEditorContext()$path
+dir  <- dirname(rstudioapi::getSourceEditorContext()$path)
+dir
+dir.root <- dirname(dir)
+setwd(dir.root) ## set this parent dir as root dir
+getwd()
+
+### the data fir
+dir.band    <- paste0(dir.root, '/data/from_gee/')
+dir.fig     <- paste0(dir.root, '/figures/');   dir.fig
+dir.cleaned <- paste0(dir.band, 'Img2Table_cleaned/'); dir.cleaned
+
+## keep more decimals
+options(digits = 6)
+options(pillar.sigfig = 6)
+
+### Disable Scientific Notation in R
+options(scipen = 999) # Modify global options in R
+```
+
+
+  
+```{r Functions}
+#' Detect outliers using IQR method
+#' 
+#' @param x     A numeric vector
+#' @param na.rm Whether to exclude NAs when computing quantiles
+#' 
+is_outlier <- function(x, na.rm = T) {
+  qs = quantile(x, probs = c(0.25, 0.75), na.rm = na.rm)
+
+  lowerq <- qs[1]
+  upperq <- qs[2]
+  iqr = upperq - lowerq 
+
+  extreme.threshold.upper = (iqr * 3) + upperq
+  extreme.threshold.lower = lowerq - (iqr * 3)
+
+  # Return logical vector
+  x > extreme.threshold.upper | x < extreme.threshold.lower
+}
+
+#' Remove rows with outliers in given columns
+#' 
+#' Any row with at least 1 outlier will be removed
+#' 
+#' @param df   A data.frame
+#' @param cols Names of the columns of interest. Defaults to all columns.
+#' 
+#' 
+remove_outliers <- function(df, cols = names(df)) {
+  for (col in cols) {
+    cat("Removing outliers in column: ", col, " \n")
+    df <- df[!is_outlier(df[[col]]),]
+  }
+  df
+}
+
+
+
+
+#' To calculate rmse, mae, r2
+source('./code/function_Predictive R-squared.R')
+
+func_accuracy_metrics <- function(predicted, actual){
+  value_rmse <- hydroGOF::rmse(sim = predicted, obs = actual, na.rm=TRUE)
+  value_mae  <- hydroGOF::mae(sim  = predicted, obs = actual, na.rm=TRUE)
+  
+  df <- data.frame(predicted = predicted, actual = actual)
+  md <- lm(actual ~ predicted, data=df)
+  r2 <- summary(md)$r.squared
+  pre.r.sqr <- pred_r_squared(md)
+  
+  print(paste0('RMSE: ', round(value_rmse, digits = 4)))
+  print(paste0('MAE:  ', round(value_mae,  digits = 4)))
+  print(paste0('R2:  ',  round(r2,         digits = 4)))
+  
+  error <- data.frame(RMSE = value_rmse, 
+                      MAE  = value_mae, 
+                      R2   = r2
+                      # R2   = pre.r.sqr,  ##
+                      # R2.pre = pre.r.sqr
+                      )
+  return(error)
+}
+```
+
+
+
+
+
+
+
+
+# Data
+
+```{r input, include=FALSE}
+xls <- "RS_do_bottom_sample_2000_2019_1x10daysBefore.xlsx"
+
+fname <- paste0(dir.cleaned, 'rs_do_sample_lagByNDay/', xls); fname
+
+df <- readxl::read_excel(path = fname) %>%
+  dplyr::filter(year == 2014) %>%
+  # dplyr::filter(nchar(YEID) <= 10) %>%
+  dplyr::rename(station = YEID, oxmgl = DO) %>%
+  as.data.frame()
+
+names(df)
+
+
+
+## variables as input --------------------------------------------------------------------
+
+### --> first test these 14 variables used in the previous paper
+var_included <- 
+  c("chlor_a", "nflh", "poc", "Rrs_412", "Rrs_443", "Rrs_469", "Rrs_488",
+    "Rrs_531", "Rrs_547", "Rrs_555", "Rrs_645", "Rrs_667", "Rrs_678","sst")
+
+
+### --> then will include all other variables into analysis
+# var_included <- !names(df) %in% 
+#   c("nweek_before", "station", "year", "Year", "oxmgl", "Depth", 
+#     "Temp", "Salin", "Source", "lat", "lon", "yy", "mm")
+  
+
+cat('In total,', length(var_included), 'variables are included for analysis.')
+
+
+## data as input -------------------------------------------------------------------------
+x <- df[, var_included]
+### aggregate by the mean value of the DO data for each station
+y <- aggregate(df$oxmgl,   by=list(df$station), FUN=mean, na.rm=T)
+
+xvar <- df[, var_included]
+yvar <- df[, 'oxmgl']
+
+data <- cbind(yvar, xvar) ## put y and x(s) in one table 
+```
+
+
+
+
+
+```{r band colors, include=FALSE}
+names(xvar)
+# colors <- c("chlor_a", "nflh",    "poc",     "Rrs_412", "Rrs_443", "Rrs_469", "Rrs_488", 
+#             "Rrs_531", "Rrs_547", "Rrs_555", "Rrs_645", "Rrs_667", "Rrs_678", "sst")
+color_non <- 'gray50'
+
+## if use part of the band variables, define the color; otherwise, use one color for all at this moment. 
+
+if ( length(names(xvar)) < 15) {
+  
+  colors <- c(color_non, color_non, color_non, "#9ecae1", "#9ecae1", "#1f78b4", "#1f78b4", 
+            "#33a02c", "#33a02c", "#33a02c", "#fdbf6f", "#fdbf6f", "#fdbf6f", color_non)
+  names(colors) <- names(xvar)
+  
+} else {
+  
+  colors <- rep(x = color_non, length(names(xvar)) )
+  names(colors) <- names(xvar)
+}
+
+
+colors
+```
+
+
+
+
+# RF model
+
+## 1. RF - pick one time lag as a test
+
+### 1.1. all samples as the training set
+
+```{r include=FALSE}
+data_train <- data
+
+n_tree   <- 99 ## 99 ## It is suggested that an odd number of `ntree` would be more ideal, as ties can be broken.
+rf.model <- randomForest(yvar ~ ., data = data_train, ntree = n_tree, 
+                         importance = TRUE, norm.votes = TRUE, proximity = TRUE, 
+                         # mtry  = 8, ## --> need to use RF tune process to decide
+                         na.action = na.omit) 
+## na.action = na.omit
+## na.action = na.roughfix  --> Impute Missing Values by median/mode.
+
+rf.model
+attributes(rf.model)
+
+plot(rf.model)
+
+### 1. accuracy using training dataset 
+predict_train <- predict(rf.model, data_train)
+plot(data_train$yvar, predict_train, main = 'Training sample', xlab = 'obs', ylab = 'Predict')
+abline(0, 1) ## abline(0,1) will draw a 1:1 line
+
+# Calculating RMSE using rmse()         
+func_accuracy_metrics(predicted = predict_train, actual = data_train$yvar)
+```
+
+
+### 1.2. 70% for training, and 30% for testing
+```{r}
+
+### 70% date for training, 30% for testing
+# set.seed(123)
+train <- sample(nrow(data), nrow(data)*0.7)
+data_train <- data[train, ]
+data_test  <- data[-train, ]
+
+
+
+# RF model -------------------------------------------------------------------------------
+rf.model <- randomForest(yvar ~ ., data = data_train, ntree = n_tree, 
+                         importance = TRUE, norm.votes = TRUE, proximity = TRUE, 
+                         # mtry  = 8, ## --> need to use RF tune process to decide
+                         na.action = na.omit) 
+## na.action = na.omit
+## na.action = na.roughfix  --> Impute Missing Values by median/mode.
+
+rf.model
+attributes(rf.model)
+
+plot(rf.model)
+
+# 1. accuracy using training dataset 
+predict_train <- predict(rf.model, data_train)
+plot(data_train$yvar, predict_train, main = 'Training sample', xlab = 'obs', ylab = 'Predict')
+abline(0, 1) ## abline(0,1) will draw a 1:1 line
+
+
+# 2. accuracy using testing dataset 
+predict_test <- predict(rf.model, data_test)
+plot(data_test$yvar, predict_test, main = 'Testing sample', xlab = 'obs', ylab = 'Predict')
+abline(0, 1)
+
+# Calculating RMSE using rmse()         
+func_accuracy_metrics(predicted = predict_train, actual = data_train$yvar)
+func_accuracy_metrics(predicted = predict_test,  actual = data_test$yvar)
+```
+
+
+
+```{r - loop 1000 times}
+acc_training <- data.frame()
+acc_testing  <- data.frame()
+
+for (i in 1:1000) {
+  print(i)
+  
+  # set.seed(999)
+  train <- sample(nrow(data), nrow(data)*0.7, replace = F)
+  data_train <- data[train, ]
+  data_test  <- data[-train, ]
+  
+  
+  
+  # RF model 
+  n_tree <- n_tree
+  rf.model <- randomForest(yvar ~ ., data = data_train, ntree = n_tree, 
+                           importance = TRUE, norm.votes = TRUE, proximity = TRUE, 
+                           # mtry  = 8, ## --> need to use RF tune process to decide
+                           na.action = na.omit) 
+
+  
+  # 1. accuracy using training dataset 
+  predict_train <- predict(rf.model, data_train)
+  # 2. accuracy using testing dataset 
+  predict_test <- predict(rf.model, data_test)
+  
+  # Calculating RMSE using rmse()         
+  # acc <- func_accuracy_metrics(predicted = predict_train, actual = data_train$yvar)
+  # acc <- cbind(id = i, acc)
+  # acc_training <- rbind(acc_training, acc)
+  
+  acc <- func_accuracy_metrics(predicted = predict_test,  actual = data_test$yvar)
+  acc <- cbind(id = i, acc)
+  acc_testing  <- rbind(acc_testing, acc)
+  
+}
+
+hist(acc_testing$RMSE)
+
+mean(acc_testing$RMSE) %>% round(digits = 3)
+(quantile(acc_testing$RMSE, c(.25, .75)) - mean(acc_testing$RMSE)) %>% round(digits = 3)
+
+mean(acc_testing$MAE) %>% round(digits = 3)
+(quantile(acc_testing$MAE, c(.25, .75)) - mean(acc_testing$MAE)) %>% round(digits = 3)
+
+
+acc_testing %>%
+  gather(key = 'error', value = 'value', 2:4) %>%
+  dplyr::mutate(error = factor(error, levels = c('R2', 'MAE', 'RMSE'))) %>%
+  ggplot(aes(x = error, y = value, fill = error)) +
+  geom_boxplot(show.legend = F) +
+  theme_bw() +
+  theme(axis.title.x = element_blank()) +
+  ggtitle('RF Testing')
+
+fname <- paste0(dir.fig, 'p2_rf_testing_accuracy1000run2.png'); fname
+# ggsave(filename = fname, plot = last_plot(), width = 6.5/2, height = 3.2, units = 'in', dpi = 300)
+  
+```
+
+
+
+
+
+```{r - plot observation-predict}
+library(ggpmisc)
+my.formula <- y ~ x
+
+### plot for `predicted` vs. `actual`
+func_plot <- function(df) {
+  cor <- df  %>%
+    ggplot(aes(x = actual, y = predicted)) +
+    geom_point(alpha = 0.7, shape = 16) +
+    geom_smooth(method = 'lm', ## lm
+                na.rm = T,
+                formula = my.formula) +
+    stat_poly_eq(formula = my.formula, aes(label = paste(..eq.label.., ..rr.label.., sep = "~~~")), parse = TRUE) +
+    geom_abline(linetype="dashed",size=1, color = 'red') +
+    scale_x_continuous(breaks = seq(0, 8, by = 2), limits = c(0, 8)) +
+    scale_y_continuous(breaks = seq(0, 8, by = 2), limits = c(0, 8)) +
+    xlab('Observed DO (mg/l)') + ylab('Predicted DO (mg/l)') +
+    theme_bw() 
+  return(cor)
+}
+
+
+df <- data.frame(predicted = predict_train, actual = data_train$yvar); which = 'train'
+acc1 <- func_plot(df = df)
+df <- data.frame(predicted = predict_test,  actual = data_test$yvar);  which = 'test'
+acc2 <- func_plot(df = df)
+
+acc <- ggarrange(acc1, acc2, labels = "AUTO")
+acc
+# fname <- paste0(dir.fig, 'corr_obs_predict_', which, '.png'); fname
+fname <- paste0(dir.fig, 'p2_corr_obs_predict.png'); fname
+# ggsave(filename = fname, plot = acc, width = 6.5, height = 3.2, units = 'in', dpi = 300)
+
+```
+
+
+
+
+
+## 2. RF - loop all time lags
+
+  Loop time lags and to see which time lag predicts the best. 
+  
+```{r loop, include=FALSE}
+
+### -> 1. to choose which year(s)
+### -> 2. to choose weekly data OR daily data
+### -> 3. to choose which DO to use (DObottom, Do10m)
+
+
+
+### --> For one single year -------------
+
+# y <- 2000
+# y <- 2003
+# y <- 2004 ## for 2004
+# y <- 2005
+# y <- 2009 ## for 2009
+# y <- 2010
+# y <- 2011
+# y <- 2013
+y <- 2014 ## for 2014
+# y <- 2015
+# y <- 2016
+# y <- 2017
+# y <- 2018
+# y <- 2019 ## for 2019
+
+y1 <- y
+y2 <- y
+
+
+
+### --> For time-series -----------------
+### Not for now
+
+
+
+## Parameters ----------------------------------------------------------------------------
+# time_unit = 'Week'
+# time_unit = '10days'
+time_unit = 'byday'      ## use daily imagery as input (potential risk: missing pixels)
+
+
+whichDO <- 'do_bottom'
+
+n_tree  <- 99
+n_randomize <- 100       ## for each time lag, run the model for `n_randomize` times
+
+
+
+# pat <- paste0('^sample_2005to2019_pixelValue_with', whichDO) ## for paper 1
+pat <- paste0('^RS_', whichDO)
+f.list <- list.files(path = dir.cleaned, pattern = pat, full.names = T, recursive = T); #f.list
+f.list <- f.list[grepl(x = f.list, pattern = time_unit, ignore.case = T)]; f.list
+
+accuracy_ls_train <- data.frame()
+accuracy_ls_test  <- data.frame()
+
+for (f in f.list) {
+  print(f)
+  
+  for (yr in seq(y1, y2)) {
+    print(yr)
+    
+    
+    data <- readxl::read_excel(path = f) %>%
+      dplyr::filter(year == yr) %>%
+      dplyr::rename(station = YEID, oxmgl = DO) %>%
+      dplyr::select(oxmgl, chlor_a:sst) %>%
+      dplyr::rename(yvar = oxmgl)
+    
+    nw <- unique(readxl::read_excel(path = f)$nweek_before); print(nw)
+  
+    ### RF model ---------------------------------------------------------
+    
+    ### 1. set the seed for reproducible ---------
+    # set.seed(123)
+    
+    ### 2. randomize 1000 times ------------------
+    ### 70% date for training, 30% for testing
+    for (i in 1:n_randomize) { ## 100
+      print(i)
+      train <- sample(nrow(data), nrow(data)*0.7)
+      data_train <- data[train, ]
+      data_test  <- data[-train, ]
+      
+      rf.model <- randomForest(yvar ~ ., data = data_train, ntree = n_tree, 
+                               importance = TRUE, norm.votes = TRUE, proximity = TRUE, 
+                               # mtry  = 8, ## --> need to use RF tune process to decide
+                               na.action = na.omit) 
+      
+      ### accuracy of training set
+      predict_train <- predict(rf.model, data_train)
+      accuracy <- func_accuracy_metrics(predicted = predict_train, actual = data_train$yvar)
+      accuracy <- cbind(year = yr, nw = nw, accuracy)
+      accuracy_ls_train <- rbind(accuracy_ls_train, accuracy)
+      
+      
+      ### accuracy of testing set
+      predict_test <- predict(rf.model, data_test)
+      accuracy <- func_accuracy_metrics(predicted = predict_test,  actual = data_test$yvar)
+      accuracy <- cbind(year = yr, nw = nw, accuracy)
+      accuracy_ls_test <- rbind(accuracy_ls_test, accuracy)
+    }
+  }
+}
+
+
+
+### Save the result
+err_rf       <- accuracy_ls_test
+err_rf_train <- accuracy_ls_train ## to spot if overfitting
+fname <- paste0('./data/results_RF/p2_err_rf_', paste(time_unit, whichDO, y1, y2, sep = '_'), '.Rdata'); fname
+save(err_rf, err_rf_train, file = fname)
+```
+
+
+
+
+```{r plot}
+
+### load RF model error data
+fname <- paste0('./data/results_RF/p2_err_rf_', paste(time_unit, whichDO, y1, y2, sep = '_'), '.Rdata'); fname
+load(fname)
+
+
+### plot
+# acc_set <- 'training'
+# acc <- accuracy_ls_train %>%
+#   gather(key = err, value = value, RMSE:R2) %>%
+#   dplyr::mutate(err = factor(err, levels = c('R2', 'RMSE', 'MAE'))) 
+
+
+acc_set <- 'testing'
+
+### input data for plotting --------------------------------------------------------------
+### option 1. if no loop n times
+acc0 <- err_rf %>%
+  gather(key = err, value = value, RMSE:R2) %>%
+  dplyr::mutate(err = factor(err, levels = c('R2', 'RMSE', 'MAE')))
+
+### option 2. if loop n times 
+# `summarySE` provides the standard deviation, standard error of the mean, and a (default 95%) confidence interval
+library(Rmisc)
+acc1 <- summarySE(data = acc0, measurevar="value", groupvars=c("year", "nw", "err"))
+
+
+### to decide which as the input for plotting
+acc <- acc1
+
+
+### find a way to smooth the results ***********************************
+err_ls <- unique(acc1$err) %>% as.character(); err_ls
+
+err_smooth <- data.frame()
+for (e in err_ls) {
+  
+  df0 <- acc1 %>% 
+    dplyr::filter(err == e) %>%
+    dplyr::rename(x = nw, y = value) %>%
+    dplyr::select(x, y, year, err)
+  
+  df1 <- ksmooth(x = df0$x, y = df0$y, 'normal', bandwidth=7, n = nrow(df0)) %>% as.data.frame() %>%
+    left_join(x = df0 %>% dplyr::select(-y), y = ., by = 'x') %>%
+    dplyr::rename(nw = x, value_smooth = y)
+  
+  err_smooth <- rbind(err_smooth, df1)
+    
+}
+
+
+acc <- merge(x = acc, y = err_smooth, by = c('year', 'nw', 'err'), all.x = T)
+
+
+### plot ---------------------------------------------------------------------------------
+theme_my <- 
+  theme_bw() +
+  theme(legend.title = element_blank(), 
+        # panel.grid = element_blank(),
+        legend.background = element_rect(fill="transparent"),
+        # legend.position = c(0.2, 0.75),
+        ) 
+
+### if only choosing 1-2 years data, we plot line graph
+### if choosing several  years data, we first plot boxplot and then plot line graph of the mean
+if (y2 - y1 < 3) {
+  
+  p_acc <-
+    ggplot(data = acc, aes(x = -nw, y = value, color = err, fill = err)) +
+  
+    ### 1. point ---------------
+    # geom_point() +
+    # geom_smooth(method = 'loess', formula = 'y ~ x') +
+    
+    ## 2. line ----------------
+    geom_line() +
+    geom_vline(xintercept = with(acc %>% filter(err == 'R2'), -nw[which.max(value)]),
+               linetype="dashed",size = .5, color = 'red') +
+    geom_vline(xintercept = with(acc %>% filter(err != 'R2'), -nw[which.min(value)]),
+               linetype="dashed",size = .5, color = 'blue') +
+    geom_ribbon(aes(ymin=value-se, ymax=value+se), alpha=0.3, linetype = 0, show.legend = F) +
+    
+    geom_line(data = acc, aes(x = -nw, y = value_smooth), color = 'red', size = 3) +
+    
+    theme_my +
+    scale_x_continuous(breaks = seq(-max(acc$nw), 0, by = 10)) +
+    xlab(paste0(time_unit, '')) +
+    ggtitle(paste(y1, y2, whichDO, sep = '-'))
+  # p_acc
+
+  
+} else {
+  ### plot box plot ---
+  p_acc <-
+    ggplot(data = acc, aes(x = factor(-nw), y = value, fill = err)) +
+    geom_boxplot() +
+    theme_my +
+    ggtitle(paste(y1, y2, whichDO, sep = '-'))
+  
+  
+  ### and plot the line of mean ---
+  ### by time lag and by year --> calculate the mean `error` of multiple years at each time lag
+  acc_mean <- accuracy_ls %>%
+    gather(key = err, value = value, RMSE:R2) %>%
+    dplyr::mutate(err = factor(err, levels = c('R2', 'RMSE', 'MAE'))) %>%
+    ungroup() %>%
+    group_by(nw, err) %>%
+    summarise(value = mean(value, rm.na = T))
+  
+  p_acc_mean <-
+    ggplot(data = acc_mean, aes(x = -nw, y = value, color = err)) +
+    geom_line() +
+    geom_vline(xintercept = with(acc_mean, -nw[which.max(value)]),
+               linetype="dashed",size = .5) +
+    geom_vline(xintercept = with(acc_mean %>% filter(err != 'R2'), -nw[which.min(value)]),
+               linetype="dashed",size = .5) +
+  
+    theme_my +
+    scale_x_continuous(breaks = seq(-max(acc_mean$nw), 0, by = 10)) +
+    xlab(paste0(time_unit, ''))+
+    ggtitle(paste(y1, y2, whichDO, sep = '-'))
+  # p_acc_mean
+  fname <- paste0(dir.fig, 'p2_accuracy_', acc_set, '_rf_by', paste(time_unit, whichDO, y1, y2, sep = '_'), '_Mean_looped.png'); 
+  # fname
+  ggsave(filename = fname, plot = p_acc_mean, width = 5, height = 3.2, units = 'in', dpi = 300)
+
+}
+
+
+p_acc
+fname <- paste0(dir.fig, 'p2_accuracy_', acc_set, '_rf_by', paste(time_unit, whichDO, y1, y2, sep = '_'), 'looped.png'); fname
+ggsave(filename = fname, plot = p_acc, width = 5, height = 3.2, units = 'in', dpi = 300)
+```
+
+
+
+
+
+
+## 3. RF model - understand the vars
+
+```{r var importance}
+
+### Variable Importance #############
+importance <- rf.model$importance %>% as.data.frame()
+head(importance, 10)
+
+# or using the function -> importance()
+# importance <- data.frame(importance(rf.model), check.names = T)
+# head(importance, 10)
+
+# plot the top 10 important vars 
+varImpPlot(rf.model, sort = T, n.var = min(10, nrow(rf.model$importance)), 
+           main = 'Top 10 - variable importance')
+
+# rank the importance list by choosing one indicator, e.g., 'IncNodePurity' 
+importance <- importance[order(importance$IncNodePurity, decreasing = TRUE), ]
+importance
+
+# save to file
+#write.table(importance, 'importance.txt', sep = '\t', col.names = NA, quote = FALSE)
+
+### Variable Importance
+varImpPlot(rf.model, sort = T, #n.var=10,
+           main="Variable Importance")
+
+
+imp <- varImpPlot(rf.model) # let's save the varImp object
+# this part just creates the data.frame for the plot part
+library(dplyr)
+imp <- as.data.frame(imp)
+imp$varnames <- rownames(imp) 
+imp$varnames <- as.factor(imp$varnames)
+
+levels(imp$varnames)
+
+# imp$colors <- colors
+names(colors) <- levels(imp$varnames)
+rownames(imp) <- NULL  
+imp$var_categ <- rep(1:2, 7) # random var category
+
+str(imp)
+
+# this is the plot part, be sure to use reorder with the correct measure name
+p_imp <- ggplot(imp, aes(x = reorder(varnames, IncNodePurity), y=IncNodePurity, 
+                         # color = as.factor(var_categ),
+                         colour = varnames,
+                         fill=as.factor(var_categ))) + 
+  
+  geom_point(size = 2) +
+  geom_segment(aes(x = varnames, xend = varnames, y=0, yend= `IncNodePurity`)) +
+  # geom_col() +
+  # geom_segment(aes(x = varnames, xend = varnames, y=0, yend= `%IncMSE`), size = 2) +
+  # scale_fill_discrete(name="Variable Group") +
+  # scale_color_discrete(name="Variable Group") +
+  scale_color_manual(name = 'varnames', values = colors)+
+  ylab("IncNodePurity") +
+  xlab("Variable Name") +
+  coord_flip() +
+  theme_my +
+  theme(panel.grid = element_blank(), legend.position = "none"); 
+p_imp
+
+fname <- paste0(dir.fig, 'var_importance.png'); fname
+ggsave(filename = fname, plot = p_imp, width = 3.2, height = 3.2, units = 'in', dpi = 300)
+
+
+
+
+## Random Forest Cross-Valdidation for feature selection  =====================
+## 交叉验证辅助评估选择特定数量的 OTU, # 5 次重复十折交叉验证
+## Not sure how to use the code.... this is to help decide how many variables should be included in the model.
+## given I see the number is usually 9 - 13, I will decide to choose 10
+# set.seed(123)
+# data_train.cv <- replicate(5, rfcv(trainx = subset(data_train, select = -yvar), 
+#                                    trainy = data_train$yvar, 
+#                                    cv.fold = 3, ## 10 
+#                                    step = .5), 
+#                            simplify = FALSE)
+# data_train.cv
+
+# select the top n most important variables 
+n <- 10
+importance_var_selected <- importance[1:n, ]
+importance_var_selected
+
+var.select <- rownames(importance_var_selected); var.select
+data.select <- data[, c(var.select, 'yvar')]
+data.select <- reshape2::melt(data.select, id = 'yvar')
+
+
+ggplot(data.select, aes(x = yvar, y = value)) +
+  geom_point() +
+  geom_smooth(formula = y~x, method = 'loess') +
+  facet_wrap(~variable, ncol = n/2, scale = 'free_y') +
+  labs(title = '', x = 'DO', y = 'Var') +
+  theme_bw()
+
+
+
+# training sample 70%, test sample 30%
+data.select <- data[, c(var.select, 'yvar')]
+set.seed(123)
+train <- sample(nrow(data.select), nrow(data.select)*0.7)
+data_train <- data.select[train, ]
+data_test  <- data.select[-train, ]
+
+
+# RF model
+set.seed(123)
+rf.model.selectVar <- randomForest(yvar~., data = data_train, ntree = n_tree,
+                                   importance = TRUE, norm.votes = TRUE, proximity = TRUE, 
+                                   na.action = na.omit)
+rf.model.selectVar
+
+# 1. accuracy using training dataset 
+predict_train <- predict(rf.model.selectVar, data_train)
+plot(data_train$yvar, predict_train, main = 'Training sample', xlab = 'actual', ylab = 'predicted')
+abline(1, 1)
+
+# 2. accuracy using testing dataset 
+predict_test <- predict(rf.model.selectVar, data_test)
+plot(data_test$yvar, predict_test, main = 'Testing sample', xlab = 'actual', ylab = 'predicted')
+
+abline(1, 1)
+
+
+# Calculating RMSE using rmse()         
+func_accuracy_metrics(predicted = predict_train, actual = data_train$yvar)
+func_accuracy_metrics(predicted = predict_test,  actual = data_test$yvar)
+```
+

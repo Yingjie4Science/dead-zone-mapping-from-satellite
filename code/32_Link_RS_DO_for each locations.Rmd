@@ -133,9 +133,12 @@ print(paste('2000 - 2019:', length(unique(df_rs$YEID)),  'locations, and', nrow(
 ### save data
 fname <- paste0(dir.cleaned, 'rs_sample_combined_2000_2019.RData'); #fname
 save(df_rs, file = fname)
-fname <- paste0(dir.cleaned, 'rs_sample_combined_2000_2019.csv');   #fname
-readr::write_csv(x = df_rs, file = fname)
+
+# fname <- paste0(dir.cleaned, 'rs_sample_combined_2000_2019.csv');   #fname
+# readr::write_csv(x = df_rs, file = fname)
 ```
+
+
 
 
 
@@ -220,16 +223,19 @@ nrow(df_merge) == nrow(df_rs_stra) ## should be "TRUE"
 
 ## 1. remove the variables used for cal stratification
 df_merge1 <- df_merge %>% 
-  dplyr::select(-c("velocity_u_0":"salinity_80"))
+  dplyr::select(-c("velocity_u_0":"water_temp_80"))
 
-df_merge2 <- merge(x = df_merge1, y = df_rs_stra %>% dplyr::select(-n_day_ago), 
+## 2. add new vars of stratification 
+df_merge2 <- merge(x = df_merge1, 
+                   y = df_rs_stra %>% dplyr::select(-n_day_ago), 
                    by = c("YEID", "Date", "date_img", "Depth"))
+names(df_merge2)
 
-## 2. to get the column names in the same order as the original data
+## 3. to get the column names in the same order as the original data
 temp1 <- head(df_merge, 1) %>% dplyr::select(-c("velocity_u_0":"mm"))
 temp2 <- head(df_merge, 1) %>% dplyr::select(c("bathymetry":"mm"))
-# names(temp1)
-# names(temp2)
+names(temp1)
+names(temp2)
 new_var <- setdiff(names(df_rs_stra), c("YEID", "Date", "date_img", "Depth", "n_day_ago")) %>% sort()
 var_ordered <- c(names(temp1), new_var, names(temp2))
 
@@ -238,9 +244,15 @@ df_mergeX <- df_merge2 %>%
 
 
 ### to confirm the column names
-# names(df_mergeX)
+names(df_merge)
+names(df_mergeX)
 # setdiff(names(df_merge), names(df_mergeX))
 # setdiff(names(df_mergeX), names(df_merge))
+
+
+getwd()
+f <- paste0(dir.sample, 'df_mergeX.RData'); f
+save(df_mergeX, file = f)
 ```
 
 
@@ -249,56 +261,79 @@ df_mergeX <- df_merge2 %>%
 ## 3. Composite and generate model samples
 
 
-```{r - 3.1 Composite by date range, message=FALSE, warning=FALSE, include=FALSE}
+```{r - load data}
+## load data
+f <- paste0(dir.sample, 'df_mergeX.RData'); f
+load(f)
 
 unique(df_mergeX$YEID) %>% length() %>% cat('\ntotal YEID:', .)
+```
 
 
-composite <- "mean"
-# composite <- "median"
+
+
+```{r - by date range, message=FALSE, warning=FALSE, include=FALSE}
+# composite <- "mean"
+composite <- "median"
+
 
 time_scale <- 'daysBefore'
 # time_scale <- 'weekBefore' 
 
-# interval <-  7  ## every one week as the time lag unit
-interval <- 10    ## every 10 days  as the time lag unit
-# interval <- 11    ## every 11
+# window <-  7  ## every one week as the time lag unit
+window <- 10    ## every 10 days  as the time lag unit
+# window <- 11    ## every 11
+# window <- 3
+
+### get the total number of chunks 
+nn <- ceiling(80/window)
 
 
-for (nw in seq(1, 8)) {
-  # print(nw)
+for (iday in seq(1, nn)) {
+  # print(iday)
   
   ### 4. Determine the RS time range to be used, considering the time-lag
-  df_merge_nw <- df_mergeX %>%
+  df_merge_iday <- df_mergeX %>%
     ungroup() %>%
     # group_by(YEID) %>%
     dplyr::mutate(year = year(Date)) %>%
     group_by(YEID, year) %>%
-    dplyr::filter(date_img >= (Date - interval*nw + 1),
-                  date_img <= (Date - interval*(nw - 1))) %>%
+    dplyr::filter(date_img >= (Date - window*iday + 1),
+                  date_img <= (Date - window*(iday - 1))) %>%
     dplyr::mutate(n_day_ago = Date - date_img,
                   n_day_ago = as.numeric(n_day_ago)) %>%
     dplyr::select(YEID, Date, date_img, n_day_ago, everything())
   
   ### calculate the mean of RS for each DO sampling location 
-  df_merge_nw_comp <- df_merge_nw %>%
+  df_merge_iday_comp0 <- df_merge_iday %>%
     as.data.frame() %>%
     ungroup() %>%
     as.data.frame() %>%
-    dplyr::mutate(Source = NA) %>%
-    dplyr::select(-Date, -date_img, -n_day_ago) %>%
+    # dplyr::select(-Date, -date_img, -n_day_ago) %>%
+    dplyr::select(YEID:Year, year) %>%
+    dplyr::select(-Date, -date_img, -n_day_ago, -Year) %>%
+    # dplyr::mutate(Source = NA) %>%
     group_by(YEID, year) %>%
     dplyr::summarise_all(list(composite), na.rm = TRUE) %>%
     as.data.frame()
   
-  unique(df_merge_nw_comp$YEID) %>% length() %>% cat('\ntotal YEID:', .)
+  df_merge_iday_comp <- df_merge_iday_comp0 %>%
+    merge(x = .,
+          y = df_do, 
+          by = "YEID", all.x = T) %>%
+    dplyr::mutate(doy_do = lubridate::yday(Date))
+  
+  unique(df_merge_iday_comp$YEID) %>% length() %>% cat('\ntotal YEID:', .)
+  
+  df_output <- cbind(nday_before = iday, df_merge_iday_comp) %>%
+    dplyr::mutate(doy_img = doy_do - iday)
 
   ### 4. write to .xlsx ------------------------------
-  prefix <- paste0(interval, 'x', nw, time_scale); prefix 
+  prefix <- paste0(window, 'x', iday, time_scale); prefix 
   fname <- paste0(dir.sample, 'rs_do_sample_lagByNDay/', 'RS_', whichDO, '_sample_2000_2019_', prefix, '_', composite, '.xlsx');
   print(basename(fname))
-  # readr::write_csv(x = cbind(nweek_before = nw, df_merge_nw_comp), path = fname)
-  writexl::write_xlsx(x = cbind(nweek_before = nw, df_merge_nw_comp), path = fname)
+  # readr::write_csv(x = cbind(nday_before = iday, df_merge_iday_comp), path = fname)
+  writexl::write_xlsx(x = df_output, path = fname)
   
   
   ### 5. convert to .shp -----------------------------
@@ -306,18 +341,18 @@ for (nw in seq(1, 8)) {
   
   
   ### to train RF in GEE, there should be no NA values in each band
-  f_noNA <- df_merge_nw_comp
+  f_noNA <- df_merge_iday_comp
   f_shp  <- st_as_sf(x = f_noNA, coords = c("lon", "lat"), remove = F, crs = projcrs) ## crs = 4326 (not sure?)
   
   ### write to .shp
-  # shp_name <- paste0('sample_2005to2019_pixelValue_with_', whichDO, '_', nw, 'x', prefix, '_noNA', '.shp');  print(shp_name)
-  # shp_name <- paste0('RS_', whichDO, '_sample_2000_2019_', nw, 'x', prefix, '.shp');  #print(shp_name)
+  # shp_name <- paste0('sample_2005to2019_pixelValue_with_', whichDO, '_', iday, 'x', prefix, '_noNA', '.shp');  print(shp_name)
+  # shp_name <- paste0('RS_', whichDO, '_sample_2000_2019_', iday, 'x', prefix, '.shp');  #print(shp_name)
   # shp_path <- paste0(dir.sample, 'rs_do_sample_lagByNDay/shp/', shp_name); #print(shp_path)
   # st_write(obj = f_shp, dsn = shp_path, layer = shp_name, driver = "ESRI Shapefile", delete_dsn = T)
   
   
   ### bind to a combined large table --------
-  # df_merge_nw_comps <- rbind(df_merge_nw_comps, cbind(nweek_before = nw, df_merge_nw_comp))
+  # df_merge_iday_comps <- rbind(df_merge_iday_comps, cbind(nday_before = iday, df_merge_iday_comp))
 }
 ```
 
@@ -330,15 +365,15 @@ for (nw in seq(1, 8)) {
   
   **Caution!!! - This chunk may run for 3-6 hours**
   
-```{r - 3.2 Composite by picking the Nearest day to fill NA, include=FALSE}
+```{r - by picking the Nearest day to fill NA, include=FALSE}
 
-## --> to use the same settings but aim to limit the date range within (interval * nw) days
-interval <- 11
-nw <- 1
+## --> to use the same settings but aim to limit the date range within (window * iday) days
+window <- 11
+iday <- 1
 
 
 ## --> filter the date range for each location
-df_merge_nw <- df_mergeX %>%
+df_merge_iday <- df_mergeX %>%
   ungroup() %>%
   # group_by(YEID) %>%
   dplyr::mutate(year = year(Date)) %>%
@@ -348,23 +383,23 @@ df_merge_nw <- df_mergeX %>%
   # dplyr::filter(YEID == "2014_006") %>%
   
   group_by(YEID, year) %>%
-  dplyr::filter(date_img >= (Date - interval*nw + 1),
-                date_img <= (Date - interval*(nw - 1))) %>%
+  dplyr::filter(date_img >= (Date - window*iday + 1),
+                date_img <= (Date - window*(iday - 1))) %>%
   dplyr::mutate(n_day_ago = Date - date_img,
                 n_day_ago = as.numeric(n_day_ago)) %>%
   dplyr::select(YEID, Date, date_img, n_day_ago, everything())
 
 ## --> format data 
-df_merge_nw_comp <- df_merge_nw %>%
+df_merge_iday_comp <- df_merge_iday %>%
   as.data.frame() %>% ungroup() %>% as.data.frame() %>% dplyr::mutate(Source = NA) %>%
   dplyr::select(-Date, -date_img) %>%
   group_by(YEID, year, n_day_ago) %>%
   arrange(n_day_ago)
 
 ## --> to get the number of variables (`n`), the list of sampling locations (`id_ls`)
-n  <- ncol(df_merge_nw_comp);  n
-nm <- names(df_merge_nw_comp); nm
-id_ls <- unique(df_merge_nw_comp$YEID)
+n  <- ncol(df_merge_iday_comp);  n
+nm <- names(df_merge_iday_comp); nm
+id_ls <- unique(df_merge_iday_comp$YEID)
 id_ls %>% length()
 
 
@@ -374,7 +409,7 @@ df_comp <- data.frame()
 for (id in id_ls) {
   
   ## --> filter data at one sampling location only
-  dfi <- df_merge_nw_comp %>%
+  dfi <- df_merge_iday_comp %>%
     dplyr::filter(YEID == id)
   
   ## --> select each variable, and to get the value from the nearest date
@@ -462,35 +497,39 @@ readr::write_csv(x = df_comp, file = f)
 
 
 
-```{r - 3.3 Composite by day, message=FALSE, warning=FALSE, include=FALSE}
+```{r - by day, message=FALSE, warning=FALSE, include=FALSE}
 
 ### DO data with sampling date -------------------------------------------------------------------------
 
-for (nw in seq(0, 90)) {
-  # print(nw)
+for (iday in seq(0, 80)) {
+  # print(iday)
   
-  df_merge_nw <- df_mergeX %>%
+  df_merge_iday <- df_mergeX %>%
     ungroup() %>%
     dplyr::mutate(year = year(Date)) %>%
     group_by(YEID, year) %>%
-    dplyr::filter(date_img == Date - nw) %>%
+    dplyr::filter(date_img == Date - iday) %>%
     dplyr::mutate(n_day_ago = Date - date_img,
                   n_day_ago = as.numeric(n_day_ago)) %>%
     dplyr::select(YEID, Date, date_img, n_day_ago, everything())
   
-  df_merge_nw_comp <- df_merge_nw %>%
+  df_merge_iday_comp <- df_merge_iday %>%
     ungroup() %>%
-    dplyr::select(-Date, -date_img, -n_day_ago) %>%
+    dplyr::select(-date_img, -n_day_ago) %>%
     dplyr::select(YEID, year, everything()) %>%
     # group_by(YEID, year) %>%
     # summarise_all(list(mean), na.rm = TRUE) %>%
-    as.data.frame()
+    as.data.frame() %>%
+    dplyr::mutate(doy_do = lubridate::yday(Date))
+  
+  df_output <- cbind(nday_before = iday, df_merge_iday_comp) %>%
+    dplyr::mutate(doy_img = doy_do - iday)
   
   ### save as xlsx --------------------------
-  fname <- paste0(dir.sample, 'rs_do_sample_lagByDay/', 'RS_', whichDO, '_sample_2000_2019_byday_', nw, 'dayBefore.xlsx'); 
+  fname <- paste0(dir.sample, 'rs_do_sample_lagByDay/', 'RS_', whichDO, '_sample_2000_2019_byday_', iday, 'dayBefore.xlsx'); 
   # print(fname)
   print(basename(fname))
-  writexl::write_xlsx(x = cbind(nweek_before = nw, df_merge_nw_comp), path = fname)
+  writexl::write_xlsx(x = df_output, path = fname)
 
 }
 ```

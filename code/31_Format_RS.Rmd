@@ -4,9 +4,22 @@ editor_options:
   chunk_output_type: inline
 ---
 
+This script aims to 
+  * read in and pre-process the spectral bands extracted from each DO sampling location 
+  * filter and keep selected bands for analysis
+  * save the cleaned data for next step
 
+The data paths
+```
+/data/
+|
+|__ /from_gee/						      ## pixel values extracted from satellite
+	|
+	|__ /Img2Table_all/				        ## raw data
+  |
+  |__ /Img2Table_cleaned/				    ## cleaned data from the raw data
 
-
+```
 
 # Set up
 

@@ -1,0 +1,600 @@
+---
+output: html_document
+editor_options: 
+  chunk_output_type: inline
+---
+
+
+
+
+# Set up
+```{r Packages, include=FALSE}
+# To clear your environment 
+remove(list = ls())
+
+library(readxl)
+library(tidyverse)
+library(dplyr)
+library(stringr)
+library(scales)
+library(lubridate)
+
+## data describe 
+library(summarytools)
+
+library(sf)
+library(proj4)
+library(maps)
+library(mapdata)
+
+library(RColorBrewer)
+library(viridis)
+# devtools::install_github("jaredhuling/jcolors")
+library(jcolors)
+library(scico) ## colors
+```
+
+
+```{r Dirs, include=FALSE}
+### Set work dir ----------------------------------------------------------
+path <- rstudioapi::getSourceEditorContext()$path
+dir  <- dirname(rstudioapi::getSourceEditorContext()$path); dir
+dirname(dir)        ## go to parent dir
+setwd(dirname(dir)) ## set this parent dir as root dir
+getwd()
+
+### the data dir ----------------------------------------------------------
+dir.path <- paste0(dirname(dir), '/data/DO/DO_GOM/DO_Integrated_Matli_NCSU')
+setwd(dir.path)
+getwd()
+
+dir.root   <- dirname(dir)
+dir.fig    <- paste0(dirname(dir), '/figures/'); dir.fig
+dir.output <- paste0(dir.path, '/data_cleaned/')
+
+today <- format(Sys.time(), "%Y%m%d"); print(today)
+
+### keep more decimals 
+options(digits = 15)
+options(pillar.sigfig = 15)
+```
+
+
+
+```{r Shapefile, include=FALSE}
+library(sf)
+library(maps)
+library(mapdata)
+
+bg_transparent <- 
+  theme(
+    panel.background = element_rect(fill = "transparent"),             # bg of the panel
+    plot.background  = element_rect(fill = "transparent", color = NA), # bg of the plot
+    # panel.grid.major = element_blank(), # get rid of major grid
+    panel.grid.minor = element_blank(), # get rid of minor grid
+    legend.background = element_rect(fill = "transparent"),    # get rid of legend bg
+    # legend.box.background = element_rect(fill = "transparent"), # get rid of legend panel bg,
+    legend.box.background = element_blank()
+  )
+
+shp <- map_data('usa') ## world
+head(shp)
+```
+
+
+# Data
+
+  First, define which years will be included in this analysis. 
+  
+  For the 2nd paper, since we plan to use MODIS data only, then starting year will be 2000. This is because Terra data is available since 2000/02 and Aqua is available since 2002/07. 
+  
+```{r}
+yr_ini <- 2000
+```
+
+## Data 1 - Matli (Load cleaned data)
+```{r}
+ls <- list.files(path = dir.output, pattern = 'DO_Integrated_Matli_NCSU.*\\.RData', full.names = T);ls
+fname <- ls[1]
+load(fname)
+
+# summary(df)
+# dfSummary(df)
+
+### data with DO info ------------------------------------------------------------
+df <- df %>%
+  dplyr::mutate(Source = as.character(Source),
+                DO_na = ifelse(DO < 0, NA, DO)) %>%
+  arrange(YEID, Year, Depth, DO)
+
+df_na <- df %>%
+  arrange(!is.na(DO_na))
+
+df <- df %>%
+  dplyr::filter(!is.na(DO_na),
+                !is.na(Date),
+                !is.na(Source)) %>% ## remove NA
+  dplyr::select(-DO_na)
+
+
+### data for sampling locations only ----------------------------------------------
+sp <- sp %>%
+  dplyr::mutate(Source = as.character(Source))
+
+length(unique(df$YEID))  ## 8827 --> 7779
+length(unique(sp$YEID))  ## 7879 --> 8117
+```
+
+
+
+
+### Data check
+```{r include=FALSE}
+## data description 
+
+### data year
+unique(df$Year)
+unique(sp$Year)
+
+### number of data in total
+cat('Total sample points:', nrow(df), "from", min(unique(df$Year)), 'to', max(unique(df$Year)))
+cat('Total sample location:', nrow(sp),"from", min(unique(sp$Year)), 'to', max(unique(sp$Year)))
+
+cat('Sample points:', 
+    df %>% dplyr::filter(Year >= yr_ini) %>% nrow(), 
+    "from 2000", 'to', max(unique(df$Year)))
+
+
+### how many sampling locations from 2000-Now
+sp %>%
+  dplyr::filter(Year >= yr_ini) %>%
+  distinct(YEID, .keep_all = T) %>%
+  nrow()
+
+### how many sampling locations before 2000
+sp %>%
+  dplyr::filter(Year < yr_ini) %>%
+  distinct(YEID, .keep_all = T) %>%
+  nrow()
+
+### change levels of the data sources
+levels(df$Source) %>% sort()
+unique(df$Source) %>% sort()
+
+levels(sp$Source) %>% sort()
+unique(sp$Source) %>% sort()
+
+mylevel <- c("SEAMAP", "LUMCON", "TAMU", "UMCES", "EPA", "NECOP", "LDWF", "latx")
+df$Source <- factor(df$Source, levels = mylevel)
+sp$Source <- factor(sp$Source, levels = mylevel)
+levels(df$Source)
+## reverse the levels
+df$Source <- fct_rev(df$Source)
+sp$Source <- fct_rev(sp$Source)
+```
+
+
+
+```{r # of samples by yr by source}
+### to see how many **samples** for each year and by sources. 
+df %>%
+  ungroup() %>%
+  group_by(Year, Source) %>%
+  tally() %>%
+  ggplot() +
+  geom_col(aes(x = Year, 
+               y = n/1000,
+               # y = n,
+               fill = Source)) +
+  theme_bw() + 
+  
+  # scale_y_log10(breaks = trans_breaks("log10", function(x) 10^x),
+  #             labels = trans_format("log10", math_format(10^.x))) +
+  # ylab('Number of samples') +
+  
+  scale_x_continuous(breaks = seq(min(sp$Year), max(sp$Year), by = 1))+
+  ylab(expression(paste('Number of samples (', 10^3, ')'))) +
+  
+  theme(axis.text.x = element_text(angle = 90, hjust = 1,vjust = 0.5), 
+        panel.grid.minor = element_blank())
+```
+
+
+
+```{r # of sample locations by yr and source}
+### to see how many **sample locations** for each year and by sources. 
+df %>%
+  dplyr::filter(Year >= yr_ini) %>%
+  ungroup() %>%
+  distinct(YEID, .keep_all = T) %>%
+  group_by(Year, Source) %>%
+  tally() %>%
+  ungroup() %>%
+  group_by(Year) %>%
+  dplyr::mutate(sum = sum(n)) %>%
+  ggplot() +
+  geom_col(aes(x = Year, y = n, fill = Source)) +
+  geom_text(aes(x = Year, y = sum, label = sum), hjust = 0.5, vjust = -0.5, size = 2.5) + 
+  theme_bw() + 
+  # scale_x_continuous(n.breaks = 10) +
+  scale_x_continuous(breaks = seq(min(sp$Year), max(sp$Year), by = 1)) +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1,vjust = 0.5),
+        legend.position = c(0.1, 0.8),
+        panel.grid.minor = element_blank()) +
+  ylab(expression(paste('Number of locations', ''))) 
+```
+
+
+
+
+```{r # of samples by month}
+str(df)
+### how many samples in each month
+df %>%
+  dplyr::mutate(month = month(Date)) %>%
+  arrange(!is.na(month)) %>%
+  group_by(month) %>%
+  tally()
+  # ggplot() +
+  # geom_histogram(aes(x = month))
+
+
+### YEID has unique location info? --> Yes. 
+df.1 <- df %>%
+  ungroup() %>%
+  distinct(YEID)
+df.2 <- df %>%
+  ungroup() %>%
+  distinct(YEID, lat, lon)
+```
+
+
+
+
+```{r # Check data by sources, eval=FALSE, include=FALSE}
+
+### check data from UMCES -------------------------
+df_um <- df %>%
+  dplyr::filter(Source == 'UMCES' & Year >= yr_ini) 
+
+str(df_um)
+df_um %>% ggplot() + 
+  geom_bar(aes(x=factor(Year))) + 
+  theme_bw()
+
+
+### check data from SEAMAP -----------------------
+df %>%
+  ungroup() %>%
+  dplyr::filter(Source == 'SEAMAP' & Year >= 2000) %>%
+  group_by(Source, Year) %>%
+  tally()
+
+df %>%
+  ungroup() %>%
+  dplyr::filter(Source == 'SEAMAP' & Year >= 2000) %>%
+  distinct(YEID, .keep_all = T) %>%
+  group_by(Source, Year) %>%
+  tally()
+
+  # ggplot() + 
+  # geom_bar(aes(x=factor(Year))) + 
+  # # geom_text(aes(label = n), hjust = 0.5, vjust = -0.5, size = 2) +
+  # theme_bw()
+
+
+### check data in 2015 -----------------------------
+str(df)
+unique(df$Source)
+
+df.2015 <- df %>%
+  filter(Source == 'SEAMAP' &
+           Year == 2015)
+
+length(unique(df.2015$YEID)) ## 2015: 94
+
+df.2014 <- df %>%
+  dplyr::filter(Source == 'LUMCON' &
+           Year == 2014)
+length(unique(as.character(df.2014$YEID))) ## 2014: 86
+```
+
+
+
+
+```{r # Subset 2000-Now}
+### subset data 2000 ~ now --------------------------
+names(df)
+df_after2000 <- df %>%
+  dplyr::filter(Year >= yr_ini)
+nrow(df_after2000)
+cat('There are', nrow(df_after2000), 'sample data during 2000 and ', max(df$Year))
+```
+
+
+
+
+
+
+
+##  Data 2 - SEAMAP data
+
+  To add additional samples from *NOAA_NCEI_Hypoxia Watch* to `df`.
+  
+```{r - Load in}
+## list the target data files
+list.files(path = dir.root, pattern = '^hypoxia_watch_GOM_csv_DO_Cleaned_', recursive = T, full.names = T); 
+
+xlsx <- list.files(path = dir.root, pattern = '^hypoxia_watch_GOM_csv_DO_Cleaned_2001_2021.xlsx', recursive = T, full.names = T)
+xlsx
+
+df_hypoxia_watch <- readxl::read_excel(path = xlsx) %>%
+  as.data.frame() %>%
+  rename_with(str_to_title) %>%
+  dplyr::mutate(Date = Yymmdd, 
+                ### to create a unique id for each location; there are duplicate ids if only use `year` and `station`
+                Month = month(Date),
+                rowid = row.names(.),
+                YEID = paste0(Year, '_hyp_watch_', str_pad(Station, 3, pad = "0"), '_', str_pad(rowid, 4, pad = "0")), 
+                DO = Oxmgl,
+                Depth_dem = NA, Temp = NA, Salin = NA, Instrument = NA, ShelfW =NA, NSW = NA, E = NA, N=NA, Cruise=NA, 
+                Source='SEAMAP', Corr = NA, 
+                lat=Latitude, lon = Longitude) %>%
+  dplyr::select(names(df_after2000))
+
+
+names(df_hypoxia_watch)
+names(df_after2000)
+
+
+### check the new id
+length(unique(df_hypoxia_watch$YEID))
+
+df_hypoxia_watch_dup <- df_hypoxia_watch %>% 
+  group_by(YEID) %>% 
+  mutate(n = n())  %>%
+  dplyr::filter(n > 1) %>%
+  arrange(YEID)
+```
+
+
+
+```{r - Data description}
+### data description 
+df_hypoxia_watch %>%
+  group_by(Year) %>%
+  tally()
+
+cat('Total sample points:', nrow(df_hypoxia_watch), 
+    "(from", min(unique(df_hypoxia_watch$Year)), 
+    'to', max(unique(df_hypoxia_watch$Year)), ")")
+
+cat('Total locations:', 
+    df_hypoxia_watch %>% 
+      distinct(YEID, .keep_all = T) %>% nrow(), 
+    "(from", min(unique(df_hypoxia_watch$Year)), 
+    'to', max(unique(df_hypoxia_watch$Year)), ")")
+```
+
+
+## Data 1-2 Merge
+```{r include=FALSE}
+### merge the two data sets --------------------------------------------------------------
+df_combine <- rbind(df_after2000, df_hypoxia_watch) %>%
+  dplyr::mutate(Date = as.Date(Date))
+
+# str(df_combine)
+names(df_combine)
+
+
+
+
+### at the meantime, we need to add spatial info from *hypoxia_watch* to `sp` as well -----
+sp1 <- sp 
+sp2 <- df_hypoxia_watch %>%
+  dplyr::mutate(OEID = NA) %>%
+  dplyr::select(names(sp1)) %>%
+  distinct(YEID, .keep_all = T)
+
+names(sp1)
+names(sp2)
+
+sp_combine <- rbind(sp1, sp2) %>%
+  dplyr::mutate(Date = as.Date(Date))
+  
+str(sp_combine)
+
+
+getwd()
+fname <- paste0(dir.output, 'df_combine.RData'); fname
+save(df_combine, sp_combine, file = fname)
+```
+
+
+
+### Data check
+  
+  The data from *hypoxia_watch* has more locations in terms of spatial coverage, but does not have detailed profile (sampling at different depth); while `df` has fewer locations and more detailed profile. 
+  
+  Therefore, `df1_2015` might have some overlap with `df2_2015` (as an example here) -- i.e., repeated location data. 
+  
+  But, it seems not matter much after compare these two, as there is a slight difference in the `lat` and `lon`. There are near to each other, and can serve as additional samples. 
+
+
+```{r}
+
+fname <- paste0(dir.output, 'df_combine.RData'); fname
+load(fname) ## `df_combine`, `sp_combine`
+
+### test and compare the difference
+
+yr <- 2014
+
+## data 1 - from Matli only 
+df1_yr <- df_combine %>%
+  dplyr::filter(nchar(YEID) < 10 &
+           Depth <=80 &
+           Year == yr) %>%
+  dplyr::mutate(mm = month(Date)) %>% dplyr::filter(mm <=9, Depth <=80) %>% dplyr::select(-mm) %>%
+  distinct(YEID, .keep_all = T)
+num_points <- nrow(df1_yr) # 205
+
+## data 2 - from `hypoxia_watch`
+df2_yr <- df_combine %>%
+  filter(nchar(YEID) >= 10 &
+           Depth <=80 &
+           Year == yr)%>%
+  dplyr::mutate(mm = month(Date)) %>% dplyr::filter(mm <=9, Depth <=80) %>% dplyr::select(-mm) %>%
+  distinct(YEID, .keep_all = T)
+
+nrow(df1_yr) + nrow(df2_yr)
+
+
+## there are some overlaps between the two layers
+ggplot() +
+  geom_point(data = df1_yr, aes(x = lon, y = lat), color = 'red',  alpha = 0.5, size = 4) +
+  geom_point(data = df2_yr, aes(x = lon, y = lat), color = 'blue', alpha = 0.5) +
+  theme_bw()
+```
+
+
+
+
+
+```{r - Remove overlapped points, include=FALSE}
+## need to remove duplicated points ------------------------------------------------------
+d1 <- 3; 
+d2 <- 2;
+remove_overlap <- df_combine %>%
+  ## 1. keep the samples taken at the bottom
+  ungroup() %>% group_by(YEID, Year) %>% dplyr::mutate(rank = order(Depth, decreasing = T)) %>% arrange(rank) %>%
+  dplyr::filter(rank == 1) %>% dplyr::select(-rank) %>%
+  ## 2. remove overlap based on sample data information 
+  ungroup() %>% group_by(Date, Year) %>% dplyr::mutate(Depth1 = round(Depth, digits = 1), DO1 = round(DO, digits = 2)) %>% 
+  dplyr::distinct(Date, Source, Depth1, DO1, .keep_all = T) %>%
+  ## 3. remove overlap based on point locations
+  dplyr::mutate(lat1 = round(lat, digits = d1), lon1 = round(lon, digits = d2), len = nchar(YEID)) %>%
+  ungroup() %>% dplyr::group_by(Date) %>% arrange(Date, Source, len) %>%
+  dplyr::distinct(Date, Source, lat1, lon1, .keep_all = T) %>%
+  ## Done
+  as.data.frame()
+
+
+yr <- 2014
+remove_overlap_test <- remove_overlap %>%
+  ungroup() %>%
+  ## check on one year
+  dplyr::filter(Year == yr) %>%
+  dplyr::mutate(mm = month(Date)) %>%
+  dplyr::filter(mm <=9, Depth <=80) %>% dplyr::select(-mm) %>%
+  # dplyr::distinct(YEID, Year) %>%
+  as.data.frame()
+projcrs <- "+proj=longlat +datum=WGS84 +no_defs +ellps=WGS84 +towgs84=0,0,0"
+remove_overlap_test_sf <- st_as_sf(remove_overlap_test, coords = c("lon", "lat"), crs = projcrs)
+fname <- paste0('./data/test_remove_overlap_test', d1, d2, '_', yr, '.shp'); fname
+# st_write(obj = remove_overlap_test_sf, dsn = fname, delete_layer = TRUE) # overwrites
+  
+
+## to update the data --------------------------------------------------------------------
+df_final <- df_combine %>%
+  ungroup() %>%
+  dplyr::filter(YEID %in% unique(remove_overlap$YEID)) %>%
+  as.data.frame()
+
+
+sp_final <- sp_combine %>%
+  ungroup() %>%
+  dplyr::filter(YEID %in% unique(remove_overlap$YEID)) %>%
+  as.data.frame()
+```
+
+
+
+```{r - Plot check}
+
+count <- remove_overlap_test %>% group_by(len) %>% tally()
+count
+count_points <- count$n 
+count_total  <- nrow(remove_overlap_test)
+mark <- paste(count_points, collapse =  " + ")
+mark
+
+remove_overlap_test %>%
+  dplyr::mutate(len = as.character(nchar(YEID))) %>%
+  # dplyr::mutate(len = (nchar(len))) %>%
+  ggplot() +
+  geom_point(aes(x = lon, y = lat, color = as.factor(len), size = len), alpha = 0.5, show.legend = F) +
+  scale_size_manual(values = c(1,1)) +
+  ggtitle(paste0(yr, ': ', mark, ' = ', count_total)) +
+  theme_bw()
+```
+
+
+
+```{r - Data description, paged.print=FALSE}
+### describe the data - how many unique sampling locations in each year?
+
+### 1. according to df data
+n0 <- df_combine %>% 
+  distinct(YEID, Year, .keep_all = T) %>%
+  group_by(Year) %>% 
+  tally() %>%
+  rename(n_combine = n)
+
+
+n1 <- df_final %>% 
+  distinct(YEID, Year, .keep_all = T) %>%
+  group_by(Year) %>% 
+  tally() %>%
+  rename(n_df = n)
+
+### 2. according to sp data
+# names(sp_final)
+n2 <- sp_final %>% 
+  distinct(YEID, Year, .keep_all = T) %>%
+  group_by(Year) %>% tally() %>%
+  rename(n_sp = n)
+
+
+### 3. limite the depth and month for hypoxia mapping
+n3 <- df_final %>% 
+  distinct(YEID, Year, .keep_all = T) %>%
+  dplyr::mutate(mm = month(Date)) %>%
+  dplyr::filter(mm <=9, Depth <=80) %>% dplyr::select(-mm) %>%
+  group_by(Year) %>% 
+  tally() %>%
+  rename(n_use = n)
+
+
+merge(n1, n2, by = 'Year') %>%
+  merge(n0, ., by = 'Year') %>%
+  merge(., n3, by = 'Year')
+```
+
+
+
+
+
+### Save updated data as csv
+```{r }
+yrmax <- max(df_final$Year, na.rm = T)
+yrmin <- min(df_final$Year, na.rm = T)
+
+
+### save as csv
+fname <- paste0(dir.output, 'DO_Integrated_df_final_', yrmin, '_', yrmax, '.xlsx');   fname
+writexl::write_xlsx(x = df_final, path = fname)
+
+fname <- paste0(dir.output, 'DO_Integrated_sp_final_', yrmin, '_', yrmax, '.xlsx');   fname
+writexl::write_xlsx(x = sp_final, path = fname)
+
+fname <- paste0(dir.output, 'DO_Integrated_sf_sp_final_', yrmin, '_', yrmax, '.RData'); fname
+save(df_final, sp_final, file = fname)
+```
+
+
+
+```{r # of sample locations by yr and source}
+## --> see `22_Format_DO.Rmd`
+```
+

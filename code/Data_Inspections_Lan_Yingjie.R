@@ -3,9 +3,10 @@ path <- rstudioapi::getSourceEditorContext()$path
 dir  <- dirname(rstudioapi::getSourceEditorContext()$path); dir
 setwd(dirname(dir)) ## set this parent dir as root dir
 getwd()
-dir.user <- './data/GEE_dead_zone_inspect_bands/processing'
-dir.rs   <- './data/GEE_dead_zone_inspect_bands/Img2Table_04_20191115' ## remote sensing data 
-dir.st   <- './data/hypoxia_watch_GOM_csv_copy'      ## station info
+
+dir.user <- './data/GEE_dead_zone_inspect_bands/processing/'
+dir.rs   <- './data/GEE_dead_zone_inspect_bands/Img2Table_04_2021-03-18/'                  ## remote sensing data # 'Img2Table_04_20191115'
+dir.st   <- './data/DO/DO_GOM/DO_SEAMAP/NOAA_NCEI_Hypoxia Watch/hypoxia_watch_GOM_csv/'    ## station info
 library(tidyverse)
 
 #list all csv files in data folder
@@ -41,7 +42,7 @@ years <- c(2003, 2004, 2005, 2007, 2009, 2010, 2011, 2012, 2013, 2015, 2016, 201
 # years <- seq(2002, 2018); years
 timeframes <- list(c(1, 7), c(8, 15), c(16, 22), c(23, 30), c(31, 37), c(38, 45), c(46, 52), c(53, 60)); timeframes
 
-###---Single Sensor
+###---Single Sensor----
 for (yr in years){
   print(yr)
   stations_yr <- read.csv(paste0(dir.st, '/', stations[grep(yr, stations)]), stringsAsFactors = FALSE)
@@ -61,7 +62,7 @@ for (yr in years){
         df <- read.csv(paste0(dir.rs, '/', yr, '_', ss, '_', pr, '.csv'), stringsAsFactors=FALSE)
         colnames(df) <- toupper(colnames(df))
         #extract keys info of stations
-        station <- subset(df, select=c("STATION"))
+        station <- subset(df, select=c("YEID")) %>% dplyr::rename(STATION = YEID)
         station <- merge(station, stations_yr, by=c("STATION"))
         station$DATEUTC <- format(strptime(station$DATEUTC, format="%m/%d/%Y"), "%Y.%m.%d")
         #get column names of df
@@ -102,17 +103,17 @@ for (yr in years){
       observations$`1m_2` <- observations$`2w_3` + observations$`2w_4`
       observations$`2m`   <- observations$`1m_1` + observations$`1m_2`
       observations <- observations[1:nrow(df),]
-      write.csv(observations, paste0(dir.user, '/Observations_', yr, '_', ss, '.csv'))
+      write.csv(observations, paste0(dir.user, '/Observations1_', yr, '_', ss, '.csv'))
     }
   }
 }
 
 
 
-###---Both Sensors
+###---Both Sensors----
 for (yr in years){
   print(yr)
-  stations_yr <- read.csv(paste0('./data/hypoxia_watch_GOM_csv/', stations[grep(yr, stations)]), stringsAsFactors = FALSE)
+  stations_yr <- read.csv(paste0(dir.st, stations[grep(yr, stations)]), stringsAsFactors = FALSE)
   colnames(stations_yr) <- toupper(colnames(stations_yr))
   colnames(stations_yr)[grep('DATE', colnames(stations_yr))] <- 'DATEUTC'
   count_pr = 1
@@ -121,9 +122,9 @@ for (yr in years){
                               '2w_1', '2w_2', '2w_3', '2w_4', '1m_1', '1m_2', '2m')
   for (pr in params){
     print(pr)
-    df_t <- read.csv(paste0('./Data/Img2Table_04_20191018', yr, '_terr_', pr, '.csv'), stringsAsFactors=FALSE)
+    df_t <- read.csv(paste0(dir.rs, yr, '_terr_', pr, '.csv'), stringsAsFactors=FALSE)
     colnames(df_t) <- toupper(colnames(df_t))
-    df_a <- read.csv(paste0('./Data/Img2Table_04_20191018', yr, '_aqua_', pr, '.csv'), stringsAsFactors=FALSE)
+    df_a <- read.csv(paste0(dir.rs, yr, '_aqua_', pr, '.csv'), stringsAsFactors=FALSE)
     colnames(df_a) <- toupper(colnames(df_a))
     #extract keys info of stations
     station <- subset(df_t, select=c("STATION"))
@@ -197,7 +198,7 @@ yr <- 2015
 
 df_a <- read.csv(paste0('./Observations_Single_Sensor/Observations_', yr, '_aqua.csv'), stringsAsFactors=FALSE)
 df_t <- read.csv(paste0('./Observations_Single_Sensor/Observations_', yr, '_terr.csv'), stringsAsFactors=FALSE)
-df   <- read.csv(paste0('./Observations_Both_Sensors/Observations_', yr, '.csv'), stringsAsFactors=FALSE)
+df   <- read.csv(paste0('./Observations_Both_Sensors/Observations_',  yr, '.csv'),      stringsAsFactors=FALSE)
 
 # par(mfrow=c(2,2), mar = c(4, 4, 1, 1))
 # for (var in vars) {

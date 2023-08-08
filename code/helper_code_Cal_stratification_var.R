@@ -21,18 +21,20 @@ d <- df_merge %>%
                 n_day_ago = as.numeric(n_day_ago)) %>%
   # dplyr::filter(n_day_ago >= 0) %>%
   dplyr::select(1:3, n_day_ago, everything()) %>%
-  dplyr::select(1:3, n_day_ago, velocity_u_0:salinity_80, Depth) 
+  dplyr::select(1:3, n_day_ago, velocity_u_0:water_temp_80, Depth)  
 
 ### |__ wide format to long format for easy filter ----
 d1 <- d %>%
-  tidyr::gather(key = vars, value = value, velocity_u_0:salinity_80) #%>%
+  tidyr::gather(key = vars, value = value, velocity_u_0:water_temp_80) #%>%
 
 
 ### |__ to get the sampling depth info ------
 d2 <- d1 %>%
   ## --> separate the `var` column to get the sampling depth value
-  separate(col = vars, into = c('var1', 'varX'), sep = 'y_', remove = F) %>%
-  dplyr::mutate(var1 = paste0(var1, 'y'), 
+  dplyr::mutate(vars = gsub('ty_',   'tyXXX_',   vars),      ## add special chr for easy split
+                vars = gsub('temp_', 'tempXXX_', vars)) %>%  ## add special chr for easy split
+  separate(col = vars, into = c('var1', 'varX'), sep = 'XXX_', remove = F) %>%
+  dplyr::mutate(#var1 = paste0(var1, 'y'), 
                 var2 = sub("^([[:alpha:]]*).*", "\\1", varX),
                 var  = paste0(var1, var2), # get the var name without depth info
                 depth_sample = as.numeric(gsub("\\D", "", varX))) %>%
@@ -40,6 +42,7 @@ d2 <- d1 %>%
   # dplyr::filter(YEID == "2014_003") %>%  # for testing 
   dplyr::filter(depth_sample <= Depth) %>% # to filter the sampling depths that are smaller than the water depth 
   arrange(YEID, Date, n_day_ago, var, depth_sample)
+# unique(d2$var)
 
 ### --> release some memory 
 rm(d, d1)
@@ -58,13 +61,14 @@ d3_surface <- d2 %>%
   group_by(YEID, Date, `date_img`, n_day_ago, var) %>%
   slice_min(order_by = depth_sample, n = 1)
 
-unique(d3_bottom$YEID)  %>% length()  
-unique(d3_surface$YEID) %>% length() %>% print()  
+# unique(d3_bottom$YEID)  %>% length()  
+# unique(d3_surface$YEID) %>% length() %>% print()  
 
 
 ### |__ to cal the difference between surface and bottom (bottom - surface) ----
 by <- subset(names(d3_surface), !names(d3_surface) %in% c('value', 'depth_sample')); 
 # by
+
 d4 <- merge(x = d3_surface %>% dplyr::select(-depth_sample), 
             y = d3_bottom  %>% dplyr::select(-depth_sample), 
             by = by) %>%

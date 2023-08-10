@@ -43,6 +43,8 @@ func_dz_raster <- function(r){
 ## versions of revision 
 postfix <- ""     ## first submission
 # postfix <- "_R1"  ## first revision
+
+today <- format(Sys.time(), "%Y%m%d"); today
 ```
 
 
@@ -61,7 +63,7 @@ list.files(path = './data/results_RF', pattern = '^area', full.names = T)
 csv <- './data/results_RF/area_byYear2010_2019_Jun_Sep.csv'
 csv <- './data/results_RF/area_byYear2000_2019_Jun_Sep.csv'
 
-area_dz_rf <- read_csv(csv) %>%
+area_dz_rf <- read_csv(csv, show_col_types = F) %>%
   rename_at(vars(starts_with("system")), ~'date') %>%
   dplyr::rename(area = Area) %>%
   dplyr::mutate(date = as.Date(date, "%B %d, %Y"), 
@@ -214,13 +216,15 @@ p<- ggplot(data = df2, aes(x=year, y=area, fill=area)) +
                   position=position_dodge(.8)) + 
     scale_fill_distiller(palette = 'Reds', direction = 1) +
     scale_x_continuous(breaks = seq(2000, 2019, 1)) +
-    geom_hline(yintercept = 5000, linetype = 'dashed', color = 'red',  alpha = .7) + 
-    annotate(geom="text", x=2018, y=5000-900, 
-             label= "Hypoxia Action Plan Goal\n(<5000)", alpha = .7, size = 3, color = 'red') +
-    
+    geom_hline(yintercept = 5000, linetype = 'dashed', color = 'red',  alpha = .9, linewidth = 1) + 
+    annotate(geom="text", x=2017, y=5000-960, 
+             # label= expression(atop("Hypoxia Action Plan Goal", 
+             #                        "(<5000"~km^2~")")), 
+             label= "Hypoxia Action Plan Goal\n(<5000)", 
+             fontface = "bold", alpha = .9, size = 3, color = 'black') +
     geom_point(data = area_Nancy, aes(x=year, y = area), alpha = .2, size = 2.5, shape = 16) +
     # geom_text(x=2018, y=20000, label="by Rabalais et al") +
-    annotate(geom="text", x=2015, y=20000-1000, label="by Rabalais et al", alpha = .4, size = 3) +
+    annotate(geom="text", x=2015, y=20000-900, label="by Rabalais et al", alpha = .4, size = 3) +
     annotate(geom = "segment", x = 2015.5, xend = 2017-.2, y = 20000-500, yend = 20000 + 2300, 
              arrow = arrow(#type = 'closed', 
                            length = unit(0.015, "npc")), 
@@ -296,13 +300,35 @@ rivers <- '../Dead_Zone_telecoupling/data/shp/TWAP_rivers.shp'
 riv <- st_read(rivers) %>% st_as_sf() %>% 
   dplyr::select(name) %>%
   dplyr::rename(river_name = name)
+
+rivers <- '../Dead_Zone_telecoupling/data/shp/rs16my07/rs16my07.shp'
+riv_ <- st_read(rivers) %>% st_as_sf() 
+rive  <- riv_ %>% 
+  dplyr::select(PNAME, PMILE) %>%
+  dplyr::rename(river_name = PNAME) %>%
+  dplyr::filter(str_detect(river_name, 'MISSISSIPPI|ATCHAFALAYA|SUWANNEE')) %>%
+  dplyr::mutate(
+    river_name = ifelse(str_detect(river_name, 'MISSISSIPPI'), 'Mississippi', river_name),
+    river_name = ifelse(str_detect(river_name, 'ATCHAFALAYA'), 'Atchafalaya', river_name),
+    river_name = ifelse(str_detect(river_name, 'SUWANNEE'), 'Suwannee', river_name),
+  )
+
+# Dissolve lines by group_id
+riv <- rive %>%
+  dplyr::group_by(river_name) %>%
+  dplyr::summarize(geometry = st_union(geometry)) 
+# plot(dissolved_sf)
+
+
 shp <- 'D:/data/shp/NaturalEarthData/ne_50m_admin_1_states_provinces/ne_50m_admin_1_states_provinces.shp'
 usa <- sf::st_read(shp) %>%
   st_as_sf() %>%
   dplyr::filter(adm0_a3 == 'USA') %>%
   dplyr::select(name)
 # st_crs(usa)
-# st_crs(bb_sf)
+st_crs(bb_sf)
+st_crs(riv)
+st_crs(riv) <- st_crs(bb_sf)
 # st_crs(bb)
 # usa_gulf <- st_crop(usa, bb_sf)
 
@@ -311,6 +337,9 @@ riv_cropped_simp <- st_simplify(x = riv_cropped)
 # plot(riv_cropped)
 # plot(riv)
 plot(riv_cropped_simp)
+
+f <- gsub('\\.shp', '_clip.shp', rivers); f
+st_write(obj = riv_cropped_simp, dsn = f, delete_layer = T)
 ```
 
 
@@ -450,6 +479,8 @@ area_over_half_occurrance_yrs %>%
   theme_bw() +
   ylab(expression("Area ("~km^2~")"))+ xlab('Year') +
   annotate(geom="text", x=2000, y=15000, label="Area with over 60% occurrence each summer", hjust = 0.08, size = 5, color = '#EF7000FF') +
+  annotate(geom="text", x=2017, y=5000+900, label= "Hypoxia Action Plan Goal (<5000)", 
+           alpha = .9, size = 3, color = 'red') +
   theme_bw() +
   theme(axis.text.x = element_text(angle = 45, hjust = 1,vjust = 1)) +
   theme(legend.position = "none", plot.margin = margin(0, 0, 0, 0, "cm"),
@@ -464,7 +495,6 @@ ggsave(filename = fname, plot = last_plot(), width = 9, height = h/7*9, units = 
 
 ## - occurance over 20 years
 ```{r}
-
 func_dz_occur_year <- function(file) {
   ras <- raster(x = file)
   ras[ras <= 0] <- 0
@@ -482,9 +512,10 @@ for (i in 1:length(ras_ls)) {
 dz_yr_freq <- (dz_yr/length(ras_ls))*100
 dz_yr_freq[dz_yr_freq <= 0] <- NA ## for better viz
 plot(dz_yr_freq)
+```
 
 
-
+```{r - plot}
 ras <- dz_yr_freq
 dz_freq_yr <-
   tm_shape(ras, bbox = bb_sf) +
@@ -497,30 +528,33 @@ dz_freq_yr <-
             # legend.hist = TRUE,
             palette = paletteer_c("grDevices::YlOrRd", 6, direction = -1))+ 
   tm_shape(usa) + 
-  tm_polygons(col = "gray95",  border.col = "gray60", lwd = .2, 
+  tm_polygons(col = "gray95",  border.col = "gray60", lwd = .2,
               legend.show=F) +
-  # tm_text("name", col = 'gray60', fontface = 'bold', size = .5, auto.placement = T, remove.overlap = T) +
-  tm_shape(riv_cropped_simp) + tm_lines(col = "royalblue1", lwd = .2, legend.col.show = F, legend.lwd.show = F) +
+  ## tm_text("name", col = 'gray60', fontface = 'bold', size = .5, auto.placement = T, remove.overlap = T) +
+  tm_shape(riv_cropped_simp) +
+  tm_lines(col = "royalblue1", lwd = 1, legend.col.show = F, legend.lwd.show = F) +
   tm_text(text = "river_name", col = 'royalblue2', 
-          along.lines = T, group = "river_name", 
-          xmod = .35, ymod = .25,
-          # just = 1,
+          # along.lines = T,
+          group = "river_name",
+          xmod = c(-1.2, 1.8, 2), ## each value contral one river, negative = left or bottom, positive = right or top
+          ymod = c(-0.5, -2.4, -2),
+          # just = c(0.5, .7),
           # auto.placement = T,
-          remove.overlap = F, 
-          size = 0.4, alpha = .6) +
+          remove.overlap = F,
+          size = 0.6, alpha = .8) +
     tm_layout(
       title = '2000-2019',
       title.position = c(0.01, 0.92), title.size = .7, title.color = 'gray30',
-      legend.position= c(0.01, 0.001), 
-      bg.color = 'white', 
+      legend.position= c(0.01, 0.001),
+      bg.color = 'white',
       # frame.lwd = .5, #frame = F,
-      legend.bg.color = 'white', legend.bg.alpha = 0.5,  
-      # legend.text.size = .4, legend.title.size = .5, 
+      legend.bg.color = 'white', legend.bg.alpha = 0.5,
+      # legend.text.size = .4, legend.title.size = .5,
       outer.margins = 0, inner.margins = 0, between.margin = 0,
       legend.text.color = 'black', legend.title.color = 'black')
 dz_freq_yr
     
-fname <- paste0('./figures/dz_freq_yr', '.png'); fname
+fname <- paste0('./figures/dz_freq_yr_', today, '.png'); fname
 tmap_save(tm = dz_freq_yr, filename = fname, width = 7, height = h, units="in", dpi = 300)
 ```
 

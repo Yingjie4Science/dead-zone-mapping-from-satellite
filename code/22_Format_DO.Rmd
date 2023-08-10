@@ -47,7 +47,7 @@ dir.root   <- dirname(dir)
 dir.do     <- paste0(dir.root, '/data/for_gee/'); dir.do
 dir.fig    <- paste0(dir.root, '/figures/'); dir.fig
 
-dir.path   <- paste0(dir.root, '/data/DO/DO_GOM/DO_Integrated_Matli_NCSU')
+dir.path   <- paste0(dir.root, '/data/DO_GOM/DO_Integrated_Matli_NCSU')
 dir.output <- paste0(dir.path, '/data_cleaned/'); dir.output
 
 setwd(dir.path)
@@ -202,7 +202,7 @@ save(do, pt, sp, file = fname)
 
 ## * Data description
 
-```{r - Fig 1. Samples by year & by source}
+```{r - Fig 2. Samples by year & by source}
 ### load DO final data - "do, pt, sp"
 fname <- paste0(dir.do, 'sample_00_19_do_pt_sp.RData'); fname
 load(fname)
@@ -244,7 +244,7 @@ pt %>%
   theme_bw() + 
   scale_x_continuous(#n.breaks = 19, labels=scaleFUN, 
                      breaks = seq(from = 2000, to = 2019, by = 1)) +
-  scale_fill_brewer(palette = "Set2", direction = -1) +
+  scale_fill_brewer(palette = "Set2", direction = -1, name = 'DO samples \nData sources') +
   # scale_fill_manual(values = wes_palette("Royal1", n = 6, type = 'continuous')) +
   theme(axis.text.x = element_text(angle = 90, hjust = 1,vjust = 0.5),
         legend.key.height = unit(size_key, "cm"),

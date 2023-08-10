@@ -27,6 +27,7 @@ library(ggpubr)
 library(viridis)
 library(tidyquant)
 
+today <- format(Sys.time(), "%Y%m%d"); today
 ```
 
 
@@ -452,8 +453,8 @@ str(err_3models_input)
 
 
 pname <- paste0('./figures/accuracy_', 
-                '95CI_lagRange', lag_range, '_', gsub('rf_r2_mse_mae_|.csv', '', basename(fname)),
-                '.png'); pname
+                '95CI_lagRange', lag_range, '_', gsub('rf_r2_mse_mae_|.csv', '', basename(fname)), 
+                '_', today, '.png'); pname
 ggsave(filename = pname, p, width=7, height=5)
 ```
 

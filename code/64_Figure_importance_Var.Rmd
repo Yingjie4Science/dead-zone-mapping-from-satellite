@@ -153,13 +153,15 @@ levels(importance_df_summ$varnames)
 importance_df_summ %>%
   dplyr::filter(grp <=30) %>%
   # ggplot(aes(x = reorder(varnames, desc(varnames)), y=value, colour = varnames)) +  # x = reorder(varnames, value)
-  ggplot(aes(x = reorder(varnames, desc(varnames)), y=value, colour = value)) + 
+  ggplot(aes(x = reorder(varnames, desc(varnames)), 
+             y=value, 
+             colour = value)) + 
   geom_point(size = 1.5) +
-  geom_segment(aes(x = varnames, xend = varnames, y=0, yend= value), size = 0.1) +
+  geom_segment(aes(x = varnames, xend = varnames, y=0, yend= value), linewidth = 0.1) +
   # geom_errorbar(aes(ymin=value-se, ymax=value+se), width=.4, position=position_dodge(0.05), size = 0.5, alpha = 0.7) +
   geom_errorbar(aes(ymin=value-ci, ymax=value+ci), width=.5, position=position_dodge(0.05), 
-                size = 0.2, alpha = 0.7, color = 'gray50') +
-  facet_wrap(~group, ncol = 6) + ## scales = 'free_x'
+                size = 0.3, alpha = 0.7, color = 'gray30') +
+  facet_wrap(~group, ncol = 3) + ## scales = 'free_x'
   # scale_color_manual(name = 'varnames', values = paletteer_d("ggthemes::Tableau_20"))+
   # scale_color_distiller(direction = 1, palette = 'viridis') +
   scale_color_viridis(direction = -1, option = 'D') +
@@ -171,8 +173,8 @@ importance_df_summ %>%
   ylab("Importance score")
 
 f <- gsub('rf_|.csv', '', basename(fname))
-f <- paste0(dir.fig, 'var_', f, '_order_0-30.png'); f
-ggsave(filename = f, plot = last_plot(), width = 7, height = 6/3, units = 'in', dpi = 500)
+f <- paste0(dir.fig, 'var_', f, '_order_0-30_', today, '.png'); f
+ggsave(filename = f, plot = last_plot(), width = 6.5, height = 4, units = 'in', dpi = 300)
 
 ```
 
@@ -198,9 +200,9 @@ levels(imp_model_summ$varnames)
 imp_model_summ %>%
   ggplot(aes(x = reorder(varnames, desc(varnames)), y=value, colour = value)) + 
   geom_point(size = 1.5) +
-  geom_segment(aes(x = varnames, xend = varnames, y=0, yend= value), size = 0.1) +
+  geom_segment(aes(x = varnames, xend = varnames, y=0, yend= value), size = 0.3) +
   geom_errorbar(aes(ymin=value-ci, ymax=value+ci), width=.5, position=position_dodge(0.05), 
-                size = 0.2, alpha = 0.7, color = 'gray50') +
+                size = 0.4, alpha = 0.7, color = 'gray30') +
   facet_wrap(~group, ncol = 6) + ## scales = 'free_x'
   scale_color_viridis(direction = -1, option = 'D') +
   coord_flip() +
@@ -210,7 +212,7 @@ imp_model_summ %>%
   ylab("Importance score")
 
 f <- gsub('rf_|.csv', '', basename(fname))
-f <- paste0(dir.fig, 'var_', f, '_order_finalModel.png'); #f
+f <- paste0(dir.fig, 'var_', f, '_order_finalModel_', today, '.png'); #f
 ggsave(filename = f, plot = last_plot(), width = 7/2, height = 6/2, units = 'in', dpi = 300)
 ```
 
@@ -227,8 +229,8 @@ f1  <- paste0('./data/from_gee/chlor_a_2000_2009.csv')
 f2  <- paste0('./data/from_gee/chlor_a_2010_2019.csv')
 
 var <- rbind(
-  readr::read_csv(f1) %>% gather(key = year, value = value, 2:ncol(.)),
-  readr::read_csv(f2) %>% gather(key = year, value = value, 2:ncol(.))
+  readr::read_csv(f1, show_col_types = F) %>% gather(key = year, value = value, 2:ncol(.)),
+  readr::read_csv(f2, show_col_types = F) %>% gather(key = year, value = value, 2:ncol(.))
 )
 
 hist(var$value)
@@ -366,7 +368,7 @@ vars_w <- vars_time %>%
 
 
 coeff = 0.400
-y1_color <- '#d7191c'#'#b2182b'
+y1_color <- '#d7191c' #'#b2182b'
 y2_color <- '#1b9e77' #'#2166ac'
   
 vars_w %>%
@@ -387,12 +389,14 @@ vars_w %>%
   geom_rect(
       data = data.frame(year = factor(
         c(2002:2004,
-          seq(2006, 2011, 1), 
+          seq(2006, 2011, 1),
           seq(2013, 2017, 1), 2019)
-        )), ## not to add 'rect' for FDA
+        )), ## not to add 'rect' for some years
       aes(x = NULL, y = NULL,
           xmin=as.Date('2000-06-01'),
-          xmax=as.Date('2000-08-30'), ymin=-Inf, ymax=Inf),
+          xmax=as.Date('2000-08-30'), 
+          ymin=-Inf, 
+          ymax=Inf),
       fill = 'orange', alpha = 0.2) +
   
   theme_bw() +   xlab("Month") + 
@@ -408,7 +412,7 @@ vars_w %>%
         
     )
 
-f <- paste0(dir.fig, 'var_sst_chlor_', time_scale, '_median.png'); f
+f <- paste0(dir.fig, 'var_sst_chlor_', time_scale, '_median_', today, '.png'); f
 ggsave(filename = f, plot = last_plot(), width = 12/1.5, height = 10/1.5, units = 'in', dpi = 400)
 ```
 
@@ -422,8 +426,8 @@ dir.N <- "G:/Shared drives/Science_L_W/dz_N/Louisiana_WQP/"
 
 f1 <- paste0(dir.N, "processed/AR_Melville_tnload_daily.csv")
 f2 <- paste0(dir.N, "processed/MR_StFrancisville_tnload_daily.csv")
-tn_ar <- readr::read_csv(f1) 
-tn_mr <- readr::read_csv(f2) 
+tn_ar <- readr::read_csv(f1, show_col_types = F) 
+tn_mr <- readr::read_csv(f2, show_col_types = F) 
 
 vars <- rbind(
   cbind(var = 'TN_ar', tn_ar) %>% dplyr::select(var, year, load_ktday, date) %>% dplyr::rename(value = load_ktday),
@@ -589,9 +593,40 @@ vars_w %>%
     )
 
 
-f <- paste0(dir.fig, 'var_TN_chlor_', time_scale, '_median2.png'); f
+f <- paste0(dir.fig, 'var_TN_chlor_', time_scale, '_median2_', today, '.png'); f
 ggsave(filename = f, plot = last_plot(), width = 12/1.5, height = 10/1.5, units = 'in', dpi = 400)
 
 ```
 
+```{r - TN by yr}
+var_tn_yr <- var_tn %>%
+  group_by(year, var) %>%
+  dplyr::summarise_at(c('value'), sum, na.rm = T)
+
+
+## plot
+var_tn_yr %>%
+  ggplot(data = ., 
+         aes(x = year, y = value, color = var)) +
+  geom_line(size = .7, show.legend = F) +
+  geom_smooth(method = 'loess') +
+  # facet_wrap(~var) +
+  scale_x_continuous(breaks = seq(from = 2000, to = 2019, by = 1)) +
+  theme_bw() +
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1,vjust = 1),
+    panel.grid.minor = element_blank(), 
+    panel.grid = element_line(size = 0.2))
+
+# var_tn %>%
+#   dplyr::mutate(date = as.Date(paste(year, month, '01', sep = '-'))) %>%
+#   ggplot(data = ., 
+#          aes(x = date, y = value)) +
+#   geom_line(size = .7, show.legend = F) +
+#   theme_bw() +
+#   theme(
+#     axis.text.x = element_text(angle = 45, hjust = 1,vjust = 0.5),
+#     panel.grid.minor = element_blank(), 
+#     panel.grid = element_line(size = 0.2))
+```
 

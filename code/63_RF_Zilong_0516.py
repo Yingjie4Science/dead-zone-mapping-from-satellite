@@ -5,8 +5,11 @@ from sklearn.model_selection  import  train_test_split
 import warnings
 from sklearn.metrics import mean_squared_error, r2_score, mean_absolute_error
 import os
+import sys
+
+## need to change working directory when using Spyder 
 path_current = os.getcwd()
-path_root    = os.path.dirname(path_current)
+path_root    = path_current #os.path.dirname(path_current)
 
 index_list = ['Depth','water_temp_surface','water_temp_dif',
               'chlor_a','nflh','Rrs_678',
@@ -84,6 +87,11 @@ for lag in range(0,81): # (0, 81) for initial test; (31,32) for the best lag
                 result = X_test
                 result['price'] = y_test
                 result['prediction'] = predictions.tolist()
+                ## save the result
+                if lag in [31, 32]:
+                    file_name = path_root + '\\data\\results_RF\\rf_prediction_lag_' + str(lag) + 'loop' + str(i) + '.csv'
+                    result.to_csv(file_name, index=False)
+                
                 mae = mean_absolute_error(y_test.values.ravel(), predictions)
                 mse = mean_squared_error(y_test.values.ravel(), predictions)
                 r2 = r2_score(y_test.values.ravel(), predictions)
@@ -146,8 +154,8 @@ dict = {'year': yr_list,
 df = pd.DataFrame(dict)
 
 file_name = path_root + '\\data\\results_RF\\rf_r2_mse_mae_' + 'by_year' + by_year.upper() + '_' + str(len(index_list)) + 'vars.csv'
-df.to_csv(file_name, index=False)
+# df.to_csv(file_name, index=False)
 
 file_name = path_root + '\\data\\results_RF\\rf_importance_' + 'by_year' + by_year.upper() + '_' + str(len(index_list)) + 'vars.csv'
-importance_df.to_csv(file_name, index=False)
+# importance_df.to_csv(file_name, index=False)
 

@@ -1,0 +1,138 @@
+---
+title: "Untitled"
+author: "Yingjie"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(include = FALSE)
+
+
+library(dplyr)
+library(tidyr)
+library(sf)
+
+getwd()
+source('./_path.R')
+```
+
+## helper data and functions
+```{r include=FALSE}
+## sf data
+# source("./code/helper_sf_state_county.R")
+f <- paste0(dir.foodfootprint, 'data/shp/sf_state_county_USA.RData')
+load(f) ## `sf_state`, `sf_county`
+
+
+## Function - map county
+source(file = paste0(dir.foodfootprint, "code/helper_func_plotUSDA.R"))
+```
+
+
+## load data
+```{r}
+### save ---------------------------------------------------------------------------------
+fname  <- paste0(dir.fert.data, '_cleaned/', 'fertilizer_farm_NP_by_county_cleaned_5YR_1987_2017.csv')
+fnamer <- gsub('csv', 'RData', fname)
+
+# readr::write_csv(x = fert, file = fname)
+# save(fert, file = fnamer)
+
+load(fnamer)
+```
+
+
+
+```{r - data}
+mydata <- fert %>% 
+  dplyr::filter(NP == 'N') %>%
+  dplyr::filter(year >= 2000) %>%
+  dplyr::left_join(
+    x = sf_county %>% dplyr::select("COUNTYKEY", "ALAND") %>% st_drop_geometry(), 
+    y = ., by = "COUNTYKEY") %>%
+  dplyr::mutate(value = value/(ALAND/1000^2), 
+                unit = "kg/km2") %>% # kg/km2 
+  tidyr::spread(key = year, value = value) %>%
+  dplyr::left_join(
+    x = sf_county %>% dplyr::select(-ALAND), 
+    y = ., by = "COUNTYKEY")
+
+
+mydata <- sf::st_as_sf(mydata)
+mydata <- st_transform(mydata, crs=2163)
+
+
+mydata_long <- mydata %>%
+  dplyr::select(-`<NA>`) %>%
+  gather(key = year, value = value, `2002`:`2017`) %>%
+  dplyr::rename('Fertilizer\n(kg/km2)' = 'value')
+
+## --> https://guides.library.duke.edu/r-geospatial/CRS
+## --> https://r-spatial.org/r/2018/10/25/ggplot2-sf-3.html
+##     using the reference US National Atlas Equal Area projection (CRS 2163)
+# head(mydata)
+```
+
+
+```{r - breaks for viz, eval=FALSE, include=FALSE}
+### breaks for viz ---------------------
+# hist(mydata$value)
+min(mydata$value, na.rm = T)
+max <- max(mydata$value, na.rm = T) %>% ceiling(); max
+
+
+### breaks using quantile 
+# library(classInt)
+# nclass = 9
+# classint <- classIntervals(mydata$value, n = nclass, style = "quantile") #can use "jenks" but is very slow
+# brks     <- as.integer(classint$brk) # approximate quantiles
+
+### breaks using USGS scale
+brks <- c(0, 50, 100, 250, 500, 1000, 2000, 4000, 6000, max) ## according to the USGS report by Falcone et al 2021
+
+# labs     <- c('[0 - 50%]', '[50% - 58%]', '[58% - 64%]', '[64% - 71%]', '[71% - 93%]')
+mydata$breaks <- cut(mydata$value, breaks=brks)
+unique(mydata$breaks)
+
+
+
+
+### color palette ----------------------
+library(RColorBrewer)
+# display.brewer.all(colorblindFriendly = TRUE)
+mypal <- colorRampPalette(brewer.pal(9,"RdYlBu"))(length(brks))
+
+
+##  plot ---------------------------------
+a <- 'breaks'
+# p <- plotUSDA(mydata, fill_by = "breaks") +
+#   scale_fill_manual('Total N \nfrom fertilizer\n(kg/km2), 2017', values = rev(mypal)) +
+#   theme(
+#     legend.position = c(0, 0.01),
+#     legend.justification = c(0, 0), # right bottom justification
+#   )
+# 
+# fname <- paste0(dir.fig.fert, 'fertilizer_N_total_kgKm2_2017_', a, '.png')
+# ggsave(filename = fname, plot = p, width = 10, height = 6, units = 'in', dpi = 300)
+```
+
+
+```{r - plot - tmap}
+names(mydata)
+
+plotUSDA_tmap(df = mydata_wide, fill_by = c("2002","2007","2012","2017" ))
+```
+
+
+```{r - plot - tmap}
+plotUSDA_tmap(df = mydata_long, fill_by = 'Fertilizer\n(kg/km2)') +
+  tm_facets("year", ncol = 2) +
+  tm_layout(
+    panel.show = T, 
+    panel.label.size = 1.5, 
+    panel.label.bg.color = NA) 
+
+fname <- paste0('./figures/fertilizer use kg per km2.png'); fname
+tmap_save(filename = fname, width = 7, height = 5, units="in", dpi = 300)
+```

@@ -1,0 +1,191 @@
+---
+title: "Figure2"
+author: "Yingjie"
+date: "08/10/2023"
+output: html_document
+editor_options: 
+  chunk_output_type: inline
+---
+
+
+  This script aims to combine sub-plots for Figure 2. 
+
+
+
+# Setup 
+```{r include=FALSE}
+remove(list = ls())
+
+getwd()
+
+library(tidyverse)
+library(dplyr)
+library(Rmisc) ## `summarySE()` provides standard deviation, standard error of the mean, and a (default 95%) confidence interval
+
+library(ggplot2)
+library(ggpubr)
+library(viridis)
+library(tidyquant)
+
+today <- format(Sys.time(), "%Y%m%d"); today
+```
+
+
+
+# Data
+
+
+## Shp data
+```{r}
+getwd()
+source('./code/helper_mappingBox.R')
+```
+
+
+## Load data
+  
+```{r message=FALSE, warning=FALSE}
+
+## 2. load RF model error data -----------------------------------------------------------
+fs <- list.files(path = './data/results_RF/', pattern = '^rf_prediction_lag_', full.names = T)
+fs
+
+df_err <- data.frame()
+
+for (f in fs) {
+  err <- readr::read_csv(f, show_col_types = F)
+  df_err <- rbind(df_err, err)
+}
+
+```
+```{r cal - mean difference}
+df_err_ <- df_err %>%
+  dplyr::select(lon:prediction) %>%
+  dplyr::rename('y' = 'price', 'y_pred' = 'prediction') %>%
+  dplyr::mutate(error = abs(y_pred - y),
+                sq_dif = error^2)
+
+
+
+### Mean difference ----------------------------------------------------------------------
+df_err_summ  <- df_err_ %>% 
+  Rmisc::summarySE(measurevar= "error", groupvars = c("lon", "lat"), na.rm = T)
+
+df_err_summ %>%
+  dplyr::mutate(brk = ifelse(error<=2, 1, 0)) %>%
+  group_by(brk) %>%
+  dplyr::summarise(n = n()) %>%
+  dplyr::mutate(freq = round(n / sum(n), digits = 2))
+  # tally()
+
+# Convert data frame to sf object
+df_err_summ_sf <- st_as_sf(df_err_summ, coords = c("lon", "lat"))
+```
+
+
+
+```{r cal - rmse}
+### RMSE ---------------------------------------------------------------------------------
+
+df_err_rmse  <- df_err_ %>% 
+  group_by(lon, lat) %>%
+  add_count() %>%
+  dplyr::mutate(
+    sum_sq_dif = sum(sq_dif),
+    rmse = sqrt(sum_sq_dif/n)) %>%
+  dplyr::distinct(lon, lat, .keep_all = T)
+
+df_err_rmse_sf <-  st_as_sf(df_err_rmse, coords = c("lon", "lat"))
+
+```
+
+
+```{r map - error}
+library(tmap)
+library(viridis)
+
+h = 1.843  # after crop ## from `66_Figure_areaTimeseries_Maps.Rmd`
+
+# p <- 
+  tm_shape(shp = df_err_summ_sf, bbox = bb_sf) +
+    tm_dots(col = 'error', 
+            title = "Model error (mg/l)", 
+            legend.hist=T,
+            style  = "pretty", 
+            palette = 'viridis', #'YlOrRd',
+            n = 5,
+            size = .05,
+            shape = 19, alpha = 0.7,
+            # legend.reverse = F,
+            textNA = 'NA', 
+            colorNA = 'gray90') +
+    ### state map
+    tm_shape(usa) + 
+    tm_polygons(col = "gray95",  border.col = "gray60", legend.show=F) +
+    ### river layer
+    tm_shape(riv) + tm_lines(col = "royalblue1", lwd = 1.5, legend.col.show = F, legend.lwd.show = F) +
+    tm_layout(
+      frame = F, 
+      frame.lwd = 0.1, 
+      legend.position = c(.57,0), 
+      # legend.bg.color = 'gray90', 
+      legend.bg.alpha = 0,
+      # legend.frame = T, legend.frame.lwd = 0.05,
+      legend.title.size = 0.9,
+      legend.text.size  = 0.7, 
+      legend.hist.width = 1.2, legend.hist.height = .45, #legend.width = 2,
+      legend.stack = 'horizontal',
+      # legend.width = -0.5,
+      # legend.height = -0.5,
+      outer.margins=0, 
+      inner.margins=0, 
+      panel.show = F)
+
+fname <- paste0('./figures/dz_errorMap_', today, '.png'); #fname
+tmap_save(filename = fname, width = 7, height = h, units="in", dpi = 300)
+```
+
+
+```{r map - rmse}
+  tm_shape(shp = df_err_rmse_sf, bbox = bb_sf) +
+    tm_dots(col = 'rmse', 
+            title = "Model RMSE (mg/l)", 
+            legend.hist=T,
+            style  = "pretty", 
+            palette = 'viridis',
+            n = 5,
+            size = .05,
+            shape = 19, alpha = 0.6,
+            # legend.reverse = F,
+            textNA = 'NA', 
+            colorNA = 'gray90') +
+    ### state map
+    tm_shape(usa) + 
+    tm_polygons(col = "gray95",  border.col = "gray60", legend.show=F) +
+    ### river layer
+    tm_shape(riv) + tm_lines(col = "royalblue1", lwd = 1.5, legend.col.show = F, legend.lwd.show = F) +
+    tm_layout(
+      frame = F, 
+      frame.lwd = 0.1, 
+      legend.position = c(.57,0), 
+      # legend.bg.color = 'gray90', 
+      legend.bg.alpha = 0,
+      # legend.frame = T, legend.frame.lwd = 0.05,
+      legend.title.size = 0.9,
+      legend.text.size  = 0.7, 
+      legend.hist.width = 1.2, legend.hist.height = .45, #legend.width = 2,
+      legend.stack = 'horizontal',
+      # legend.width = -0.5,
+      # legend.height = -0.5,
+      outer.margins=0, 
+      inner.margins=0, 
+      panel.show = F)
+
+fname <- paste0('./figures/dz_errorMap_rmse_', today, '.png'); #fname
+tmap_save(filename = fname, width = 7, height = h, units="in", dpi = 300)
+```
+
+
+
+
+

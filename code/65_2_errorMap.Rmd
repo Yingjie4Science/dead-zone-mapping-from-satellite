@@ -97,6 +97,21 @@ df_err_rmse  <- df_err_ %>%
 
 df_err_rmse_sf <-  st_as_sf(df_err_rmse, coords = c("lon", "lat"))
 
+
+### some stats for MS ---
+df_err_rmse %>%
+  dplyr::mutate(
+    brk = case_when(
+      rmse <= 1 ~ 1, 
+      rmse <= 2 ~ 2, 
+      T ~ 3)) %>%
+  group_by(brk) %>%
+  dplyr::summarise(n = n()) %>%
+  dplyr::mutate(freq = round(n / sum(n), digits = 2))
+
+# summary(df_err_rmse$rmse)
+df_err_rmse %>% 
+  Rmisc::summarySE(measurevar= "rmse", na.rm = T)
 ```
 
 

@@ -38,3 +38,15 @@
     |
     |...
 ```
+
+## Authors
+The authors thank the Environmental Science and Policy Program Summer Research Fellowship for their financial support.
+- [Dr. Yingjie Li](https://github.com/Yingjie4Science)<sup>1</sup>
+- Zilong Xia
+- Dr. Lan Nguyen
+- Dr. Ho Yi Wan
+- ...
+- [Prof. Jianguo Liu](https://www.canr.msu.edu/people/jianguo_jack_liu)<sup>2</sup>
+
+<sup>1</sup>Stanford University  
+<sup>2</sup>Michigan State University

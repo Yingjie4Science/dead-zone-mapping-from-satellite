@@ -467,6 +467,10 @@ dz_freq_yr <-
           # auto.placement = T,
           remove.overlap = F,
           size = 0.6, alpha = .8) +
+  tm_scale_bar(breaks = c(0, 50, 100), text.size = .5, 
+               position = c(0.9, 0), color.dark = 'gray40') + 
+  tm_compass(type = "4star", size = 2, position = c(0.9, 0.2), 
+             text.color = 'gray40',color.dark = 'gray40') + ## "right", "top"
     tm_layout(
       title = '2000-2019',
       title.position = c(0.01, 0.92), title.size = .7, title.color = 'gray30',

@@ -408,9 +408,6 @@ mean(acc_testing$R2, na.rm = T) %>% print()
 
 
 
-
-
-
 ## 2. RF - loop all time lag
   Loop time lags and to see which time lag predicts the best. 
 ```{r loop, include=FALSE}

@@ -227,34 +227,64 @@ scaleFUN <- function(x) sprintf("%.0f", x)
 #         legend.key.width  = unit(size_key, "cm")) +
 #   theme(legend.position = c(0.9, 0.8)) 
 
+
+
 library(wesanderson)
 ### this is the same plot but with labels 
-pt %>%
+pt_s <- pt  %>%
   dplyr::filter(Year >= yr_ini) %>%
   ungroup() %>%
-  distinct(YEID, .keep_all = T) %>%
+  dplyr::distinct(YEID, .keep_all = T) %>%
   group_by(Year, Source) %>%
   tally() %>%
   ungroup() %>%
   group_by(Year) %>%
   dplyr::mutate(sum = sum(n)) %>%
+  ## remove the previous factor levels
+  dplyr::mutate(Source = as.character(Source))
+
+unique(pt_s$Source)
+
+Source_levels <- c('LDWF', 
+                   # 'NECOP', 
+                   'EPA', 
+                   'UMCES', 
+                   'TAMU', 'LUMCON', 'SEAMAP')
+Source_labels <- c(
+  'Louisiana Department of Wildlife and Fisheries (LDWF)',
+  # 'Nutrient Enhanced Coastal Productivity Program (NECOP)', 
+  'U.S. Environmental Protection Agency (EPA)', 
+  'University of Maryland Center for Environmental Sciences (UMCES)', 
+  'Texas A&M University (TAMU)', 
+  'Louisiana Universities Marine Consortium (LUMCON)', 
+  'Southeast Area Monitoring and Assessment Program (SEAMAP)'
+)
+
+pt_s %>%
+  dplyr::mutate(Source = factor(Source, levels = Source_levels, labels = Source_labels)) %>%
   ggplot() +
   geom_col(aes(x = Year, y = n, fill = Source), alpha = .7) +
   geom_text(aes(x = Year, y = sum, label = sum), hjust = 0.5, vjust = -0.5, size = 2.5) + 
   theme_bw() + 
   scale_x_continuous(#n.breaks = 19, labels=scaleFUN, 
                      breaks = seq(from = 2000, to = 2019, by = 1)) +
-  scale_fill_brewer(palette = "Set2", direction = -1, 
-                    name = 'Field-collected \ndissolved oxygen (DO) \nsample sources') +
+  scale_fill_brewer(palette = "Set2", 
+                    # name = 'Field-collected \ndissolved oxygen (DO) \nsample sources',
+                    name = 'Field-collected dissolved oxygen (DO) sample sources',
+                    direction = -1, 
+                    ) +
   # scale_fill_manual(values = wes_palette("Royal1", n = 6, type = 'continuous')) +
   theme(axis.text.x = element_text(angle = 90, hjust = 1,vjust = 0.5),
         legend.key.height = unit(size_key, "cm"),
         legend.key.width  = unit(size_key, "cm"),
-        legend.position = c(0.85, 0.8),
+        # legend.position = c(0.85, 0.8),  ## if use abbreviation only
+        legend.position = "bottom",        ## if use the full names
         panel.grid.minor = element_blank()) +
+  ## if use the full names
+  guides(fill = guide_legend(ncol = 1, direction = "vertical")) +
   ylab(expression(paste('Number of sampling locations', ''))) 
-pname <- paste0(dir.fig, 'sample_num_bySource_DZT.png'); pname
-ggsave(filename = pname, plot = last_plot(), width = 7, height = 5, units = 'in', dpi = 300) ## bg = "transparent",
+pname <- paste0(dir.fig, 'sample_num_bySource_DZT_fullname.png'); pname
+ggsave(filename = pname, plot = last_plot(), width = 7, height = 5+2, units = 'in', dpi = 300) ## bg = "transparent",
 ```
 
 

@@ -31,20 +31,16 @@ library(jcolors)
 
 
 ### Set work dir ----------------------------------------------------------
-path <- rstudioapi::getSourceEditorContext()$path
-dir  <- dirname(rstudioapi::getSourceEditorContext()$path); dir
-dirname(dir)        ## go to parent dir
-setwd(dirname(dir)) ## set this parent dir as root dir
+# path <- rstudioapi::getSourceEditorContext()$path
+# dir  <- dirname(rstudioapi::getSourceEditorContext()$path); dir
+# dirname(dir)        ## go to parent dir
+# setwd(dirname(dir)) ## set this parent dir as root dir
 getwd()
 
 ### the data fir 
-dir.path <- './data/DO/DO_GOM/DO_Integrated_Matli_NCSU'
-setwd(dir.path)
-getwd()
-
+dir.do.raw <- './data/DO_GOM/DO_Integrated_Matli_NCSU/data_raw/'
+dir.output <- './data/DO_GOM/DO_Integrated_Matli_NCSU/data_cleaned/'
 dir.fig    <- './figures/'
-dir.output <- './data_cleaned/'
-
 
 today <- format(Sys.time(), "%Y%m%d"); print(today)
 
@@ -85,11 +81,10 @@ options(pillar.sigfig = 15)
 ## Read data raw
 ```{r }
 ### Read in data ------------------------------------------------------------
-getwd()
-list.files(path = './data_raw', pattern = '.xlsx$', full.names = T)
+list.files(path = dir.do.raw, pattern = '.xlsx$', full.names = T)
 
-df1.xlsx <- list.files(path = './data_raw', pattern = '^Summary.xlsx', full.names = T); df1.xlsx
-df2.xlsx <- list.files(path = './data_raw', pattern = '^RawData.xlsx', full.names = T); df2.xlsx
+df1.xlsx <- list.files(path = dir.do.raw, pattern = '^Summary.xlsx', full.names = T); df1.xlsx
+df2.xlsx <- list.files(path = dir.do.raw, pattern = '^RawData.xlsx', full.names = T); df2.xlsx
 
 df11 <- read_excel(path = df1.xlsx, sheet = 1, col_names = T) # Summary
 df21 <- read_excel(path = df2.xlsx, sheet = 1, col_names = T) # SBToML
@@ -161,9 +156,9 @@ st1 <- st
 ## Read data NEW
 ```{r}
 getwd()
-list.files(path = './data_raw', pattern = '.xlsx$', full.names = T)
+list.files(path = dir.do.raw, pattern = '.xlsx$', full.names = T)
 
-xlsx_new <- list.files(path = './data_raw', pattern = '^newData.xlsx', full.names = T); xlsx_new
+xlsx_new <- list.files(path = dir.do.raw, pattern = '^newData.xlsx', full.names = T); xlsx_new
 excel_sheets(xlsx_new)
 
 

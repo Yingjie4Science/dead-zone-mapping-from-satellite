@@ -1,0 +1,100 @@
+---
+output: html_document
+editor_options: 
+  chunk_output_type: inline
+---
+
+This script aims to 
+  * examine the correlation between DO and rs variables
+  * check the multicollinearity among RS variables. 
+
+# Set up
+
+```{r Packages and dir, include=FALSE}
+# To clear your environment
+# remove(list = ls())
+
+library(readxl)
+library(dplyr)
+
+source('./code/_path.R')
+```
+
+
+
+
+
+
+# Data
+
+## Sample data
+
+```{r - xlsx}
+
+xls <- paste0('./data/Chlorophyll_a data/Chlorophyll_a_1243776172852889586.xlsx'); xls
+
+df <- readxl::read_excel(path = xls)
+names(df)
+
+
+chl <- df %>%
+  dplyr::select(-c(organization_formal_name, 
+                   x, y, note, activity_start_time, activity_start_timezone, monitoring_location_name,
+                   sample_fraction)) %>%
+  dplyr::mutate(year = year(activity_start_date),
+                month = month(activity_start_date)) %>%
+  dplyr::filter(year >= 2000, 
+                month >=5,
+                month <=9,
+                activity_depth_height > 0,
+                activity_depth_height <10
+                ) %>%
+  arrange(monitoring_location_identifier) %>%
+  as.data.frame()
+
+hist(chl$activity_depth_height)
+```
+
+
+```{r - shp}
+f <- './data/Chlorophyll_a data/Chlorophyll_a_7003234383276519096/Chlorophyll_Observation_Points.shp'; f
+d <- st_read(f)
+
+d.sf <- d %>%
+  dplyr::rename('id' = 'monitoring',
+                'date' = 'activityst',
+                'depth' = 'activityde',
+                'depth_unit' = 'activity_3', 
+                'var_name' = 'characteri', 
+                'var_value' = 'resultmeas', 
+                'var_unit' = 'resultme_1'
+                ) %>%
+  dplyr::select(-c(organizati, 
+                   note, activity_1, activity_2, monitori_1, resultsamp)) %>%
+  dplyr::mutate(year = year(date),
+                month = month(date)) %>%
+  dplyr::filter(year >= 2000, 
+                month >=5,
+                month <=9,
+                depth >= 0,
+                depth <= 5
+                ) 
+
+# Convert 3D geometries to 2D
+d.sf_2D <- d.sf %>%
+  st_drop_geometry() %>%
+  st_as_sf(., coords = c("longitude", "latitude"), crs = 4326, remove = FALSE)
+
+
+f <- './data/Chlorophyll_a data/Chlorophyll_a_7003234383276519096/Chlorophyll_Observation_Points_filter.shp'
+st_write(obj = d.sf_2D, dsn = f, driver = "ESRI Shapefile", delete_dsn = T)
+```
+
+
+## GEE imagery
+
+  "users/yingjieli/DZT/01b_ic2csv_chl_a"
+
+# Plot
+
+

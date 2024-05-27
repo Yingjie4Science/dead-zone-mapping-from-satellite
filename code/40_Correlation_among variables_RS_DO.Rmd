@@ -90,12 +90,13 @@ is_outlier <- function(x, na.rm = T) {
 #' @param cols Names of the columns of interest. Defaults to all columns.
 #' 
 #' 
-remove_outliers <- function(df, cols = names(df)) {
+remove_outliers <- function(df) {
+  cols = names(df)
   for (col in cols) {
     cat("Removing outliers in column: ", col, " \n")
     df <- df[!is_outlier(df[[col]]),]
   }
-  df
+  return(df)
 }
 ```
 
@@ -111,33 +112,52 @@ remove_outliers <- function(df, cols = names(df)) {
 # xls <- paste0(dir.cleaned, 'by_timelag_withDO/', 'sample_2000to2019_pixelValue_withDObottom_2_weekBefore.xlsx'); xls
 # xls <- paste0(dir.cleaned, 'by_timelag_withDO/', 'sample_2000to2019_pixelValue_withDObottom_2_10DaysBefore.xlsx'); xls
 
-dir.dz1 <- getwd() %>% dirname(.) %>% dirname(.)
-xls <- paste0(dir.dz1, 
-              "/hypoxiaMapping/data/data_from_gee/Img2Table_cleaned/",
-              'by_timelag_withDO/', 
-              'sample_2000to2019_pixelValue_withDObottom_2_10DaysBefore.xlsx'); xls
+
+# dir.dz1 <- getwd() %>% dirname(.) %>% dirname(.)
+# xls <- paste0(dir.dz1, 
+#               "/hypoxiaMapping/data/data_from_gee/Img2Table_cleaned/",
+#               'by_timelag_withDO/', 
+#               'sample_2000to2019_pixelValue_withDObottom_2_10DaysBefore.xlsx'); xls
+
+
+dir.dz2 <- getwd()
+xls <- paste0("./data/from_gee/rs_do_sample/",
+              'rs_do_sample_lagByDay/', 
+              'RS_do_bottom_sample_2000_2019_byday_30dayBefore.xlsx'); xls
 
 df <- readxl::read_excel(path = xls)
 names(df)
 
+vars_remove <- c("nday_before", 
+                 "YEID",
+                 # "water_temp_surface", 
+                 "year", "Date",
+                 "Temp", "Salin", "Source", "doy_do",
+                 "yy", "mm")
+
+vars_of_interest <- c("chlor_a","nflh","poc","Rrs_412","Rrs_443","Rrs_469",
+                      "Rrs_488","Rrs_531","Rrs_547","Rrs_555", 
+                      "Rrs_645","Rrs_667","Rrs_678","sst")
 
 dfp <- df %>%
-  dplyr::filter(nchar(YEID) < 15) %>%
+  dplyr::select(-any_of(vars_remove)) %>%
+  # dplyr::filter(nchar(YEID) < 15) %>%
   # dplyr::filter(year >= 2005, year <= 2015) %>%
   as.data.frame()
 
 
+
+
 ## remove outliers in spectrum -----------------------------------
-vars_of_interest <- c("chlor_a","nflh","poc","Rrs_412","Rrs_443","Rrs_469",
-                      "Rrs_488","Rrs_531","Rrs_547","Rrs_555", 
-                      "Rrs_645","Rrs_667","Rrs_678","sst")
-dfp_NOoutliers <- remove_outliers(dfp, vars_of_interest) %>%
-  filter(!is.na(YEID))
+dfp_NOoutliers <- remove_outliers(dfp) %>%
+  # filter(!is.na(YEID)) %>%
+  as.data.frame()
 
 
 
 
-dfp <- dfp_NOoutliers
+dfp <- dfp_NOoutliers %>%
+  drop_na()
 
 
 
@@ -183,7 +203,7 @@ dfp %>%
 ```
 
 
-```{r DO ~ ALL}
+```{r DO ~ ALL, eval=FALSE, include=FALSE}
 ### quick visualization using ggpairs (GGally package)----------------
 library(GGally)
 dfp %>%
@@ -192,6 +212,91 @@ dfp %>%
     # lower = list(continuous = wrap("points", color = "black", alpha = 0.5))
     ) +
   theme_bw()
+```
+
+
+
+```{r - luwen}
+
+# http://www.sthda.com/english/wiki/visualize-correlation-matrix-using-correlogram
+## S:\Users\luwen\Code\states_tile_detection\scripts\RandomForest\reference
+
+library(corrplot)
+library(ggcorrplot)
+library(RColorBrewer)
+
+# check correlation 
+traindata_Select_cor <- dfp %>%
+  dplyr::select(-any_of(c(
+    'Depth',              ## highly correlated with `bathymetry`
+    'Rrs_488',            ## highly correlated with Rrs_412 and Rrs_443;
+    'Rrs_443',            ## highly correlated with Rrs_412 and Rrs_469
+    'Rrs_678',            ## 
+    'Rrs_667',            ## highly correlated with Rrs_678
+    'Rrs_555', 'Rrs_547', 'Rrs_531', ## lowerest importance; Rrs_555 and Rrs_547 are highly correlated
+    'velocityu_dif',         ## highly correlated with velocityu_surface
+    "velocityv_dif",         ## highly correlated with velocityv_surface
+    "water_temp_surface"  ## highly correlated with `sst`
+  )))
+
+M <- cor(traindata_Select_cor)
+head(round(M,2))
+
+col <- colorRampPalette(c("#BB4444", "#EE9988", "#FFFFFF", "#77AADD", "#4477AA"))
+
+# Initialize file path
+# pdf(file = "yourfilename.pdf") \\
+
+
+png(filename = paste0(dir.fig, "Correlation_vars_2024_4.png"), pointsize = 20, height = 1200, width = 1200)
+
+corrplot(corr = M, 
+       method = "ellipse", # named 'circle' (default), 'square', 'ellipse', 'number', 'pie', 'shade' and 'color'. 
+       type = "lower",  # 'full' (default), 'upper' or 'lower'
+       # col=col(200),  
+       col = brewer.pal(n = 10, name = "RdBu"), # colorblin safe: BrBG, RdBu, RdYlBu
+       diag = F,  # whether display the correlation coefficients on the principal diagonal
+       order = "original", 
+                      # 'original' for original order (default).
+                      # 'AOE' for the angular order of the eigenvectors.
+                      # 'FPC' for the first principal component order.
+                      # 'hclust' for the hierarchical clustering order.
+                      # 'alphabet' for alphabetical order.
+       addCoef.col = "gray", # Add coefficient of correlation
+       addCoefasPercent = F,  # translate coefficients into percentage style for spacesaving.
+       tl.col="black", 
+       # tl.srt=45, #Text label color and rotation
+       # Combine with significance
+       tl.cex = 0.6,
+       number.cex= 0.6,
+       #p.mat = p.mat, sig.level = 0.01, insig = "blank",
+       mar=c(0,0,1,0)
+       # hide correlation coefficient on the principal diagonal
+       )
+# Close PNG device
+dev.off()
+
+
+
+# 
+# library(lares)
+# corr_cross(df = traindata_Select_cor, rm.na = T, max_pvalue = 0.05, top = 5, grid = T)
+```
+
+
+```{r}
+cor_matrix <- M
+cor_matrix <- as.matrix(cor_matrix)
+cor_matrix[upper.tri(cor_matrix)] <- NA
+
+high_cor <- cor_matrix %>%
+  as.data.frame() %>%
+  dplyr::mutate(x = row.names(.)) %>%
+  dplyr::select(x, everything()) %>%
+  gather(key = 'y', value = 'coef', 2:ncol(.)) %>%
+  dplyr::filter(x != y, !is.na(coef)) %>%
+  arrange(desc(abs(coef))) %>%
+  dplyr::filter(abs(coef) > 0.8)
 ```
 
 

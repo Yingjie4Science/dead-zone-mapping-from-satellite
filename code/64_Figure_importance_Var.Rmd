@@ -17,39 +17,20 @@ https://cran.r-project.org/web/packages/randomForest/randomForest.pdf
 # To clear your environment
 # remove(list = ls())
 
-# library(tidyverse)
-library(dplyr)
-library(tidyr)
-library(lubridate)
 require(hydroGOF)  ## for calculating RMSE and MAE
 library(Rmisc)     ## `summarySE()` provides sd, se of the mean, and a (default 95%) confidence interval
-
 
 library(cowplot)
 library(ggpubr)
 library(viridis)
 
+source('./code/_path.R')
+
 
 ### Set work dir ----------------------------------------------------------
-path <- rstudioapi::getSourceEditorContext()$path
-dir  <- dirname(rstudioapi::getSourceEditorContext()$path)
-dir
-dir.root <- dirname(dir)
-setwd(dir.root) ## set this parent dir as root dir
-getwd()
-
 ### the data fir
 dir.band    <- './data/data_from_gee/'
-dir.fig     <- paste0(dir.root, '/figures/');   dir.fig
 dir.cleaned <- paste0(dir.band, 'Img2Table_cleaned/'); dir.cleaned
-
-
-## keep more decimals
-options(digits = 10)
-options(pillar.sigfig = 10)
-### Disable Scientific Notation in R
-options(scipen = 999) # Modify global options in R
-
 
 today <- format(Sys.time(), "%Y%m%d"); today
 ```
@@ -77,9 +58,15 @@ theme_my <-
 ```{r message=FALSE, warning=FALSE}
 list.files(path = './data/results_RF/', pattern = '^rf_importance_', full.names = T)
 
+
+##' The following data were generated from code `63_RF_Zilong_edited_20240506.ipynb`
+##' 
 fname <- paste0('./data/results_RF/rf_importance_by_yearNO.csv');
-fname <- paste0('./data/results_RF/rf_importance_by_yearNO_22vars.csv') ## all variables
-fname <- paste0('./data/results_RF/rf_importance_by_yearNO_12vars.csv')
+fname <- paste0('./data/results_RF/rf_importance_by_yearNO_26vars.csv') ## all variables
+fname <- paste0('./data/results_RF/rf_importance_by_yearNO_18vars.csv') ## remove highly correlated variables, with all data sources
+fname <- paste0('./data/results_RF/rf_importance_by_yearNO_18vars_subset_SEAMAP.csv') ## with only SEAMAP data
+
+# fname <- paste0('./data/results_RF/rf_importance_by_yearNO_12vars.csv') ## included in the final model
 
 ## put every 5 days as a group 
 xfold <- 5
@@ -101,7 +88,7 @@ importance_dfs <- importance_df %>%
 
 
 
-```{r plot}
+```{r plot w all var}
 importance_df_summ <- importance_df %>% 
   Rmisc::summarySE(data = ., measurevar="value", groupvars = c('year', 'varnames', 'group'), na.rm = T) %>%
   dplyr::mutate(varnames = as.factor(varnames)) %>%
@@ -117,7 +104,7 @@ labels_my <- c(
 importance_df_summ$grp   <- importance_df_summ$group
 importance_df_summ$group <- factor(x = importance_df_summ$group, 
                                     levels = unique(importance_df_summ$group), 
-                                    labels = labels_my)
+                                    labels = labels_my[1:length(unique(importance_df_summ$group))])
 
 # color_subset <- color14[!names(color14) %in% feature_remove]
 # names(colors) <- levels(importance_df_summ$varnames)
@@ -149,6 +136,10 @@ importance_df_summ$varnames <- factor(x = importance_df_summ$varnames,
                                       labels = labels_vars_lab, ordered = T)
 levels(importance_df_summ$varnames)
 
+n_var <- length(unique(importance_df_summ$varnames)); n_var
+
+## the height of saved figure
+fig_h <- n_var*4/12
 
 importance_df_summ %>%
   dplyr::filter(grp <=30) %>%
@@ -160,7 +151,7 @@ importance_df_summ %>%
   geom_segment(aes(x = varnames, xend = varnames, y=0, yend= value), linewidth = 0.1) +
   # geom_errorbar(aes(ymin=value-se, ymax=value+se), width=.4, position=position_dodge(0.05), size = 0.5, alpha = 0.7) +
   geom_errorbar(aes(ymin=value-ci, ymax=value+ci), width=.5, position=position_dodge(0.05), 
-                size = 0.3, alpha = 0.7, color = 'gray30') +
+                linewidth = 0.3, alpha = 0.7, color = 'gray30') +
   facet_wrap(~group, ncol = 3) + ## scales = 'free_x'
   # scale_color_manual(name = 'varnames', values = paletteer_d("ggthemes::Tableau_20"))+
   # scale_color_distiller(direction = 1, palette = 'viridis') +
@@ -173,15 +164,15 @@ importance_df_summ %>%
   ylab("Importance score")
 
 f <- gsub('rf_|.csv', '', basename(fname))
-f <- paste0(dir.fig, 'var_', f, '_order_0-30_', today, '.png'); f
-ggsave(filename = f, plot = last_plot(), width = 6.5, height = 4, units = 'in', dpi = 300)
+f <- paste0(dir.fig, paste('var', f, 'order_0-30', today, sep = '_'), '.png'); f
+ggsave(filename = f, plot = last_plot(), width = 6.5, height = fig_h, units = 'in', dpi = 300)
 
 ```
 
 
 
 
-```{r for final model}
+```{r plot for final model}
 imp_model <- importance_df %>%
   dplyr::filter(lag %in% c(28, 29, 30, 31)) %>%
   dplyr::mutate(group = 'Final model')
@@ -213,7 +204,7 @@ imp_model_summ %>%
 
 f <- gsub('rf_|.csv', '', basename(fname))
 f <- paste0(dir.fig, 'var_', f, '_order_finalModel_', today, '.png'); #f
-ggsave(filename = f, plot = last_plot(), width = 7/2, height = 6/2, units = 'in', dpi = 300)
+ggsave(filename = f, plot = last_plot(), width = 7/2, height = fig_h/2, units = 'in', dpi = 300)
 ```
 
 

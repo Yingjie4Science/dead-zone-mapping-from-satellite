@@ -127,7 +127,7 @@ func_accuracy_metrics <- function(predicted, actual){
 
 ## 1. Test RF on one lag
 
-```{r - Data, include=FALSE}
+```{r - Data}
 # xls <- "sample_2005to2019_pixelValue_withDObottom_1_weekBefore.xlsx" ## old file name
 # xls <- "RS_do_bottom_sample_2000_2019_1x7daysBefore.xlsx"
 # xls <- "RS_do_bottom_sample_2000_2019_1x10daysBefore.xlsx"           ## 2021-11-01; mean R2 = 0.66
@@ -146,13 +146,35 @@ names(df)
 
 
 
+df %>%
+  dplyr::mutate(water_temp_surface = (water_temp_surface/100/2),
+                bathymetry = -bathymetry) %>%
+  ggplot(data=.) +
+  
+  # geom_point(aes(x=sst, y = water_temp_surface)) +
+  # geom_point(aes(x=sst, y = Temp)) +
+  # geom_point(aes(x=water_temp_surface, y = Temp)) +
+  geom_point(aes(x=Depth, y = bathymetry)) +   # highly correlated 
+  
+  geom_abline(slope = 1, color = 'red') +
+  theme_bw()
+```
+
+
+```{r - Data - variables, include=FALSE}
 ## variables as input --------------------------------------------------------------------
+names(df)
 
 ### --> first test these 14 variables used before
 var_included <- 
-  c("chlor_a", "nflh", "poc", "Rrs_412", "Rrs_443", "Rrs_469", "Rrs_488",
-    "Rrs_531", "Rrs_547", "Rrs_555", "Rrs_645", "Rrs_667", "Rrs_678","sst")
+  c("chlor_a", "nflh", "poc", "sst",
+    "Rrs_412", "Rrs_443", "Rrs_469", "Rrs_488", "Rrs_531", 
+    "Rrs_547", "Rrs_555", "Rrs_645", "Rrs_667", "Rrs_678")
 
+var_remove <- 
+  c("nweek_before", "station", "water_temp_surface", "Year", "Date",
+    "oxmgl", "Temp", "Salin", "Source",
+    "yy", "mm")
 
 ### --> then will include all other variables into analysis
 # var_included <- !names(df) %in% 
@@ -164,11 +186,16 @@ cat('In total,', length(var_included), 'variables are included for analysis.')
 
 
 ### aggregate by the mean value of all the bands for each station, in case any duplicated information 
-x <- aggregate(df[, var_included], by=list(df$station), FUN=mean, na.rm=T)
+# x <- aggregate(df[, var_included], by=list(df$station), FUN=mean, na.rm=T)
+# xvar <- x[,-1] ## remove the column of station id 
+
+x <- df %>%
+  dplyr::select(-any_of(var_remove)) %>%
+  as.data.frame()
+xvar <- x
+
 ### aggregate by the mean value of the DO data for each station
 y <- aggregate(df$oxmgl,   by=list(df$station), FUN=mean, na.rm=T)
-
-xvar <- x[,-1] ## remove the column of station id 
 yvar <- y[,-1]
 
 rf.data <- cbind(yvar, xvar) ## put y and x(s) in one table 
@@ -212,8 +239,6 @@ colors
 ```{r - RF para}
 
 n_tree <- 99  ## It is suggested that an odd number of `ntree` would be more ideal, as ties can be broken.
-
-
 
 percent_for_training <- 0.7
 # percent_for_training <- 0.8

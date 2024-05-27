@@ -12,16 +12,16 @@ This script aims to
 
 ```{r Packages and dir, include=FALSE}
 # To clear your environment
-# remove(list = ls())
+remove(list = ls())
 
 library(readxl)
 library(dplyr)
+library(sf)
+library(lubridate)
+library(cowplot)
 
 source('./code/_path.R')
 ```
-
-
-
 
 
 
@@ -29,7 +29,7 @@ source('./code/_path.R')
 
 ## Sample data
 
-```{r - xlsx}
+```{r - xlsx, warning=FALSE}
 
 xls <- paste0('./data/Chlorophyll_a data/Chlorophyll_a_1243776172852889586.xlsx'); xls
 
@@ -87,7 +87,7 @@ d.sf_2D <- d.sf %>%
 
 
 f <- './data/Chlorophyll_a data/Chlorophyll_a_7003234383276519096/Chlorophyll_Observation_Points_filter.shp'
-st_write(obj = d.sf_2D, dsn = f, driver = "ESRI Shapefile", delete_dsn = T)
+# st_write(obj = d.sf_2D, dsn = f, driver = "ESRI Shapefile", delete_dsn = T)
 ```
 
 
@@ -95,6 +95,110 @@ st_write(obj = d.sf_2D, dsn = f, driver = "ESRI Shapefile", delete_dsn = T)
 
   "users/yingjieli/DZT/01b_ic2csv_chl_a"
 
+```{r}
+
+dir_chla <- "./data/from_gee/Img2Table_chla/"
+
+fs <- list.files(path = dir_chla, pattern = '_chlor_a.csv$', full.names = T)
+# fs
+
+# Initialize an empty list to store individual data frames
+df_list <- list()
+
+# Loop through each CSV file and read it into a data frame
+for (f in fs) {
+  # print(basename(f))
+  sensor = gsub('_chlor_a.csv|[0-9]|_', '', basename(f))
+  df <- readr::read_csv(f, show_col_types = FALSE) %>%
+    dplyr::select(-`.geo`, -`system:index`, -id) %>%
+    dplyr::select(date:year, everything()) %>%
+    gather(key = date_s, value = chla_s, 12:ncol(.)) %>%
+    dplyr::filter(chla_s != "No data") %>%
+    mutate(date_s = as.Date(as.character(date_s), format = "%Y-%m-%d"),
+           date = as.POSIXct(date/1000, origin = "1970-01-01", tz = "UTC"),
+           date = as.Date(date, format = "%Y%m%d"),
+           sensor = sensor,
+           date_dif = date - date_s) %>%
+    dplyr::filter(abs(date_dif) < 1) %>%
+    as.data.frame()
+  df_list <- append(df_list, list(df))
+}
+
+# 
+# d <- df %>%
+#   dplyr::filter(chla_s != "No data") %>%
+#   mutate(date_s = as.Date(as.character(date_s), format = "%Y-%m-%d"),
+#          date = as.POSIXct(date/1000, origin = "1970-01-01", tz = "UTC"),
+#          date = as.Date(date, format = "%Y%m%d"),
+#          date_dif = date - date_s) %>%
+#   dplyr::filter(abs(date_dif) < 1) %>%
+#   as.data.frame()
+
+# Bind all data frames in the list into a single data frame
+dfs <- do.call(rbind, df_list) %>%
+  dplyr::filter(depth < 0.5,
+                var_value > 0) %>%
+  dplyr::mutate(chla_s = as.numeric(chla_s)) %>%
+  group_by(sensor, date, year, featureID, latitude, longitude) %>%
+  dplyr::summarise_at(vars(var_value, chla_s), ~ mean(., na.rm = TRUE))
+
+```
+
+
 # Plot
+
+```{r - pre-process}
+# Function to remove outliers using IQR
+remove_outliers <- function(x, q1 = 0.15) {
+  # Calculate Q1 (25th percentile) and Q3 (75th percentile)
+  Q1 <- quantile(x, q1, na.rm = TRUE)
+  Q3 <- quantile(x, 1-q1, na.rm = TRUE)
+  
+  # Calculate IQR
+  IQR <- Q3 - Q1
+  
+  # Define the lower and upper bounds for outliers
+  lower_bound <- Q1 - 1.5 * IQR
+  upper_bound <- Q3 + 1.5 * IQR
+  
+  # Remove outliers
+  x[x < lower_bound | x > upper_bound] <- NA # Mark outliers as NA
+  
+  return(x)
+}
+
+
+# Apply the remove_outliers function to each numeric column ------------------------------
+sens <- 'aqua'
+sens <- 'terr'
+
+
+dfs_ <- dfs %>%
+  as.data.frame() %>%
+  dplyr::filter(sensor == sens) %>%
+  dplyr::mutate_at(vars(var_value, chla_s), remove_outliers) %>%
+  drop_na()
+
+```
+
+
+
+```{r - plot}
+
+library(ggpubr)
+
+dfs_ %>%
+  ggplot(aes(x = var_value, y = chla_s)) +
+  geom_point(aes(color = year), alpha = 0.5)+
+  geom_abline(slope = 1, colour = 'red') +
+  geom_smooth(method = "lm", se = TRUE, color = "blue", linetype = "dashed") +
+  stat_regline_equation(label.x = max(dfs_$var_value)/1.3, label.y = max(dfs_$chla_s)/2, aes(label = after_stat(eq.label))) + # Add equation
+  stat_cor(label.x = max(dfs_$var_value)/1.3, label.y = max(dfs_$chla_s)/2-2, aes(label = paste(..rr.label.., sep = "~~~"))) + # Add R² annotation
+  xlab('Chlorophyll_a (ug/l) - Observed') + ylab('Chlorophyll_a (ug/l) - MODIS') +
+  theme_bw()
+
+f <- paste0(dir.fig, 'SM_chl_a_obs_vs_satellite_', sens, '_', today, '.png'); f
+ggsave(filename = f, plot = last_plot(), width = 6, height = 5, units = 'in', dpi = 300)
+```
 
 

@@ -29,6 +29,8 @@ source('./code/_path.R')
 
 ## Sample data
 
+  - The `xlsx` and `shp` data are the same after checking.
+
 ```{r - xlsx, warning=FALSE}
 
 xls <- paste0('./data/Chlorophyll_a data/Chlorophyll_a_1243776172852889586.xlsx'); xls
@@ -46,8 +48,8 @@ chl <- df %>%
   dplyr::filter(year >= 2000, 
                 month >=5,
                 month <=9,
-                activity_depth_height > 0,
-                activity_depth_height <10
+                activity_depth_height >= 0,
+                activity_depth_height <=5
                 ) %>%
   arrange(monitoring_location_identifier) %>%
   as.data.frame()
@@ -60,7 +62,7 @@ hist(chl$activity_depth_height)
 f <- './data/Chlorophyll_a data/Chlorophyll_a_7003234383276519096/Chlorophyll_Observation_Points.shp'; f
 d <- st_read(f)
 
-d.sf <- d %>%
+chl.sf <- d %>%
   dplyr::rename('id' = 'monitoring',
                 'date' = 'activityst',
                 'depth' = 'activityde',
@@ -81,19 +83,23 @@ d.sf <- d %>%
                 ) 
 
 # Convert 3D geometries to 2D
-d.sf_2D <- d.sf %>%
+chl.sf_2D <- chl.sf %>%
   st_drop_geometry() %>%
   st_as_sf(., coords = c("longitude", "latitude"), crs = 4326, remove = FALSE)
 
 
 f <- './data/Chlorophyll_a data/Chlorophyll_a_7003234383276519096/Chlorophyll_Observation_Points_filter.shp'
-# st_write(obj = d.sf_2D, dsn = f, driver = "ESRI Shapefile", delete_dsn = T)
+# st_write(obj = chl.sf_2D, dsn = f, driver = "ESRI Shapefile", delete_dsn = T)
 ```
 
 
 ## GEE imagery
 
-  "users/yingjieli/DZT/01b_ic2csv_chl_a"
+  - Upload `chl.sf_2D` to GEE, and 
+
+  - Run GEE code `users/yingjieli/DZT/01b_ic2csv_chl_a`, output csv files
+  
+  - Load csv files in R
 
 ```{r}
 
@@ -136,7 +142,7 @@ for (f in fs) {
 
 # Bind all data frames in the list into a single data frame
 dfs <- do.call(rbind, df_list) %>%
-  dplyr::filter(depth < 0.5,
+  dplyr::filter(depth < 0.1,
                 var_value > 0) %>%
   dplyr::mutate(chla_s = as.numeric(chla_s)) %>%
   group_by(sensor, date, year, featureID, latitude, longitude) %>%
@@ -168,9 +174,15 @@ remove_outliers <- function(x, q1 = 0.15) {
 }
 
 
+```
+
+
+
+```{r - plot}
+
 # Apply the remove_outliers function to each numeric column ------------------------------
 sens <- 'aqua'
-sens <- 'terr'
+# sens <- 'terr'
 
 
 dfs_ <- dfs %>%
@@ -179,26 +191,60 @@ dfs_ <- dfs %>%
   dplyr::mutate_at(vars(var_value, chla_s), remove_outliers) %>%
   drop_na()
 
-```
-
-
-
-```{r - plot}
 
 library(ggpubr)
 
-dfs_ %>%
+# Calculate the maximum x-value for each category
+max_x_values <- dfs_ %>%
+  group_by(sensor, year) %>%
+  dplyr::summarize(max_x = max(var_value, na.rm = T),
+                   max_y = max(chla_s, na.rm = T))
+
+# Merge the max_x_values back into the original data frame
+dfs_ <- dfs_ %>%
+  left_join(max_x_values, by = c('sensor', "year"))
+
+
+p <- dfs_ %>%
   ggplot(aes(x = var_value, y = chla_s)) +
   geom_point(aes(color = year), alpha = 0.5)+
   geom_abline(slope = 1, colour = 'red') +
   geom_smooth(method = "lm", se = TRUE, color = "blue", linetype = "dashed") +
-  stat_regline_equation(label.x = max(dfs_$var_value)/1.3, label.y = max(dfs_$chla_s)/2, aes(label = after_stat(eq.label))) + # Add equation
-  stat_cor(label.x = max(dfs_$var_value)/1.3, label.y = max(dfs_$chla_s)/2-2, aes(label = paste(..rr.label.., sep = "~~~"))) + # Add R² annotation
+  stat_regline_equation(
+    label.x = max(dfs_$max_x)/1.3, label.y = max(dfs_$max_y)/2, aes(label = after_stat(eq.label))) + # Add equation
+  stat_cor(
+    label.x = max(dfs_$max_x)/1.3, label.y = max(dfs_$max_y)/2-2, aes(label = paste(..rr.label.., sep = "~~~"))) + # Add R² annotation
   xlab('Chlorophyll_a (ug/l) - Observed') + ylab('Chlorophyll_a (ug/l) - MODIS') +
   theme_bw()
-
+p
 f <- paste0(dir.fig, 'SM_chl_a_obs_vs_satellite_', sens, '_', today, '.png'); f
 ggsave(filename = f, plot = last_plot(), width = 6, height = 5, units = 'in', dpi = 300)
+
+
+
+# Fit a linear regression model
+model <- lm(var_value ~ chla_s, data = dfs_)
+model
+# Make predictions using the fitted model
+predictions <- predict(model, dfs_)
+# Calculate the Mean Absolute Error
+mae <- mean(abs(predictions - dfs_$var_value))
+# Print the MAE
+print(paste("Mean Absolute Error:", mae))
+
+# 计算 var1 和 var2 之间的相关系数
+cor_var1_var2 <- cor(dfs_$var_value, dfs_$chla_s)
+
+# 打印结果
+print(paste("var1 - var2 Correlation Coefficient:", cor_var1_var2))
+
+
+
+## facet plot ----------------------------------------------------------------------------
+
+p + facet_wrap(~year, scales = 'free_y')
+f <- paste0(dir.fig, 'SM_chl_a_obs_vs_satellite_', sens, '_', today, '_.png'); f
+ggsave(filename = f, plot = last_plot(), width = 6*2, height = 5*2, units = 'in', dpi = 300)
 ```
 
 

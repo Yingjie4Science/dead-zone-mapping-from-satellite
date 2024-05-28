@@ -276,8 +276,6 @@ corrplot(corr = M,
 # Close PNG device
 dev.off()
 
-
-
 # 
 # library(lares)
 # corr_cross(df = traindata_Select_cor, rm.na = T, max_pvalue = 0.05, top = 5, grid = T)
@@ -311,6 +309,9 @@ lowerFn <- function(data, mapping, method = "lm", ...) {
   p
 }
 
+
+library(GGally)
+##' slow and not looking good
 dfp %>% 
   dplyr::select(chlor_a:sst, DO) %>%
   ggpairs(
@@ -332,6 +333,7 @@ dfp %>%
 
 ```{r chl ~ nflh in each years}
 dfp %>% 
+  dplyr::rename('year' = 'Year') %>%
   dplyr::select(chlor_a, nflh, year) %>%
   
   ggplot(aes(x = chlor_a, y = nflh)) +

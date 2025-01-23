@@ -121,18 +121,20 @@ a <- 'breaks'
 ```{r - plot - tmap}
 names(mydata)
 
-plotUSDA_tmap(df = mydata_wide, fill_by = c("2002","2007","2012","2017" ))
+plotUSDA_tmap(df = mydata, fill_by = c("2002","2007","2012","2017" ))
 ```
 
 
-```{r - plot - tmap}
-plotUSDA_tmap(df = mydata_long, fill_by = 'Fertilizer\n(kg/km2)') +
+```{r - plot - tmap - Fig S6}
+plotUSDA_tmap(df = mydata_long, 
+              fill_by = 'Fertilizer\n(kg/km2)',
+              fill_title = expression("Fertilizer" ~ "(" ~ "kg/km"^2 ~ ")") ) +
   tm_facets("year", ncol = 2) +
   tm_layout(
     panel.show = T, 
     panel.label.size = 1.5, 
     panel.label.bg.color = NA) 
 
-fname <- paste0('./figures/fertilizer use kg per km2.png'); fname
+fname <- paste0('./figures/fertilizer use kg per km2', today, '.png'); fname
 tmap_save(filename = fname, width = 7, height = 5, units="in", dpi = 300)
 ```

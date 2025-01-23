@@ -252,7 +252,7 @@ upper = 'uci'; lower = 'lci'
 
 ### 3. range of lag to plot --------------------------------------------------------------
 lag_range <- 30
-lag_range <- 80
+# lag_range <- 80
 # lag_range <- 60
 
 

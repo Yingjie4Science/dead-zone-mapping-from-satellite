@@ -289,7 +289,7 @@ ggsave(filename = pname, plot = last_plot(), width = 7, height = 5+2, units = 'i
 
 
 
-```{r - Fig S1. Sample map by year}
+```{r - Fig S2. Sample map by year}
 ## 2. sample distribution facet by year --------------------------------------------------
 pt %>% 
   dplyr::filter(Year >= yr_ini) %>%
@@ -335,7 +335,7 @@ ggsave(filename = pname, plot = last_plot(), width = 7, height = 5, units = 'in'
 ```
 
 
-```{r - Fig. Sample map by source}
+```{r - Fig X. Sample map by source}
 ## 3. sample distribution facet by data source -------------------------------------------
 pt %>% 
   ggplot() + 
@@ -402,8 +402,7 @@ writexl::write_xlsx(x = do_bottom, path = fname)
 
 
 
-```{r data desc - temporal}
-
+```{r data desc - temporal - Fig S3}
 library("wesanderson")
 
 ### this is hard to see the trend
@@ -432,16 +431,16 @@ do_bottom %>%
   facet_wrap(~Year) + ## , scales = 'free_x'
   theme_bw() +
   # theme(axis.text.x = element_text(angle = 45, hjust = 1,vjust = 0.5)) +
-  ggtitle('Number of samples by month') + 
+  ggtitle('Number of sample locations by month') + 
   ylab('Count') + xlab("Month")
   
 
 pname <- paste0(dir.fig, 'SM_Number of samples by date_R1.png'); pname
 ggsave(filename = pname, plot = last_plot(), width = 7*1.5, height = 4*1.5, units = 'in', dpi = 300)
+```
 
 
-
-
+```{r data desc - temporal - SEAMAP}
 ### For each agency, sampling date 
 levels(do_bottom$Source)
 
@@ -466,7 +465,7 @@ do_bottom %>%
   facet_wrap(~Year) + ## , scales = 'free_x'
   theme_bw() +
   # theme(axis.text.x = element_text(angle = 45, hjust = 1,vjust = 0.5)) +
-  ggtitle('Number of samples by month') + 
+  ggtitle('Number of sample locations by month') + 
   ylab('Count') + xlab("Month")
 ```
 

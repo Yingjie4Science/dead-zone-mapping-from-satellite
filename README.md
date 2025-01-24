@@ -11,24 +11,24 @@ https://code.earthengine.google.com/?accept_repo=users/yingjieli/DZT
 ### R scripts
 ```
 ## Data pre-clening 
-"10_DO1_byMatli_data_cleaning.Rmd"                       
-"11_DO1+DO2HypoxiaWatch_DataDesc.Rmd"
-"22_Format_DO.Rmd"                                       
-"31_Format_RS.Rmd"
-"32_Link_RS_DO_for each locations.Rmd"                   
-"40_Correlation_among variables_RS_DO.Rmd"
-"41_chla_satellite_vs_obsRmd.Rmd"
+10_DO1_byMatli_data_cleaning.Rmd                      
+11_DO1+DO2HypoxiaWatch_DataDesc.Rmd
+22_Format_DO.Rmd ------------------------------------- Figure 2, S2, S3
+31_Format_RS.Rmd
+32_Link_RS_DO_for each locations.Rmd                  
+40_Correlation_among variables_RS_DO.Rmd
+41_chla_satellite_vs_obsRmd.Rmd
 
 ## Modeling                       
-"62_RF_model.Rmd"
-"63_RF_Zilong_edited_20240506.ipynb"
-"64_Figure_importance_Var.Rmd"                           
-"65_1_Figure_model_performance.Rmd"
-"65_2_errorMap.Rmd"
+62_RF_model.Rmd
+63_RF_Zilong_edited_20240506.ipynb
+64_Figure_importance_Var.Rmd ------------------------- Figure 4, S4, S7
+65_1_Figure_model_performance.Rmd -------------------- Figure 5
+65_2_errorMap.Rmd"
 
 ## Supporting data                                     
-"66_Figure_areaTimeseries_Maps.Rmd"
-"70_fertilizer_NP_byCounty.Rmd"
+66_Figure_areaTimeseries_Maps.Rmd -------------------- Figure 6, 7, 9, 10
+70_fertilizer_NP_byCounty.Rmd ------------------------ Figure S6
 ```  
   
 ## Data

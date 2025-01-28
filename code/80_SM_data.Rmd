@@ -1,0 +1,163 @@
+---
+title: "Untitled"
+author: "Yingjie"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+source('./code/_path.R')
+```
+
+
+
+## Percentile of global dead zone size 
+```{r}
+f <- './data/eutrophication_hypoxia map data Set_WRI/diaz-2008-TableS1.xlsx'
+
+d <- readxl::read_excel(f) %>%
+  mutate(Area_km2 = as.numeric(Area_km2))
+
+summary(d$Area_km2)
+numbers <- d$Area_km2
+
+# Number to find the quantile for
+target_number <- 5000
+
+# Compute the empirical cumulative distribution function
+ecdf_func <- ecdf(numbers)
+
+# Get the quantile of the target number
+target_percentile <- ecdf_func(target_number) * 100
+
+# Print the quantile
+print(target_percentile)
+```
+
+
+```{r}
+# Create a data frame for the target point
+target_df <- data.frame(
+  Percentile = target_percentile,
+  Value = target_number
+)
+
+# Calculate every 10th percentile
+percentiles <- quantile(numbers, probs = seq(0, 1, by = 0.1), na.rm = TRUE)
+
+# Create a data frame for plotting
+df <- data.frame(
+  Percentile = as.numeric(gsub("%", "", names(percentiles))),  # Convert to numeric and scale to 0-100
+  Value = as.numeric(percentiles)                    # Corresponding values
+)
+
+# Plot the percentiles
+ggplot(df, aes(x = Percentile, y = Value)) +
+  geom_point(size = 3, color = "blue") +
+  geom_line(group = 1, color = "blue") +
+  geom_text(aes(label = Value), vjust = -0.5, size = 3.5) +  # Add labels above points
+  # Add the target number as a special point
+  geom_point(data = target_df, aes(x = Percentile, y = Value), 
+             color = "red", size = 2, shape = 17, alpha = 0.7) +  # Red triangle
+  geom_text(data = target_df, aes(x = Percentile, y = Value, label = Value), 
+            color = "red", vjust = -0.5, size = 4) +  # Label the target point
+  labs(title = "Every 10th Percentile of Numbers",
+       x = "Percentile",
+       y = "Value") +
+  scale_x_continuous(breaks = seq(0, 100, by = 10)) +  # Ensure x-axis goes from 0 to 100
+  theme_bw()
+```
+
+
+
+## Nutrient loads to the Gulf
+  Casey Lee, 2022, Nutrient loads to the Gulf of Mexico produced by the USGS National Water Quality Network, 1968-2021: U.S. Geological Survey, https://doi.org/10.5066/P9G0EEUE.
+  
+  
+  #`SITE_ABB`: A text abbreviation of the site name primarily for use within the National Water Quality Program											
+  
+  									
+  `CONSTIT`: A character abbreviation indicative of the water-quality constituent being reported. Values include 
+  NO3_NO2: nitrate plus nitrite filtered as N; 
+  *TN: total nitrogen as N*; 
+  *TP: total phosphorus as P*; 
+  SSC: suspended-sediment concentration; 
+  NH3: ammonia filtered as N; 
+  OP: orthophosphate filtered	 as P; 
+  SI: silica filtered as SiO2; 
+  CHL: Filtered chloride; 
+  TDS: Total Dissolved Solids	
+  
+  `WY`: A numeric identifier of the water year in which data were recorded.  A water year is defined as the 12-month period from October 1 for any given year through September 30 of the following year. The water year is designated by the calendar year in which it ends.											
+  
+  `MODTYPE`: A character indicator of the type of model used to compute water-quality loads as indicated in Lee and others (2017). Values include
+  WRTDS_K indicating the WRTDS-K method; 
+  WRTDS_FNG indicating flow-normalized loads computed using the WRTDS generalized flow-normalization method; and 
+  WRTDS_FNS indicating flow-normalized loads computed using the WRTDS stationary flow-normalization method	
+  
+  `TONS`: *Annual water-quality or flow-normalized annual water-quality load measured in tons*											
+  `TONS_L90`: Lower 90 percent confidence interval about the annual or flow-normalized annual water-quality load measured in tons. NA values indicate that confidence intervals were not computed.											
+  `TONS_U90`: Upper 90 percent confidence interval about the annual or flow-normalized annual water-quality load measured in tons. NA values indicate that confidence intervals were not computed.	
+  
+  `CONC`: *Annual flow-normalized concentration measured in milligrams per liter*. Values are only published along with annual flow-normalized water-quality loads	 NA values are published along with WRTDS-K loads)										
+  `CONC_L90`: Lower 90 percent confidence interval about the annual flow-normalized water-quality load measured in tons. NA values indicate that confidence intervals were not computed.											
+  `CONC_U90`: Upper 90 percent confidence interval about the annual flow-normalized water-quality load measured in tons. NA values indicate that confidence intervals were not computed.											
+
+```{r}
+f <- './data/Casey Lee, 2022, Nutrient loads to the Gulf of Mexico/WRTDSloads.csv'
+
+d <- readr::read_csv(f, skip = 14, show_col_types = F)
+
+names(d)
+unique(d$CONSTIT)
+unique(d$MODTYPE)
+
+var <- 'TN'
+# var <- 'TP'
+
+if(var == 'TN'){
+  var_title <- 'Total nitrogen'
+} else if(var == 'TP') {
+  var_title <- 'Total phosphorus'
+} else {
+  warning('Please provide more information!')
+}
+
+d_tn <- d %>%
+  filter(SITE_ABB == 'GULF',
+         CONSTIT == var,
+         MODTYPE == 'WRTDS_FNS',
+         WY >= 1990 & WY <= 2020)
+
+p1 <- d_tn %>%
+  ggplot(aes(x = WY, y = TONS)) +
+  geom_point(size = 3, color = "blue") +
+  geom_line(group = 1, color = "blue") +
+  geom_vline(xintercept = 2000, linetype = 'dashed', color = 'red', alpha = .5) + 
+  # facet_wrap(~MODTYPE) +
+  theme_bw() +
+  ggtitle(paste0(var_title, ' load \nmeasured at the Gulf site (tons)')) +
+  xlab('Water year') + ylab('Load (tons)') +
+  labs(caption = "")
+
+p2 <- d_tn %>%
+  ggplot(aes(x = WY, y = CONC)) +
+  geom_point(size = 3, color = "blue") +
+  geom_line(group = 1, color = "blue") +
+  geom_vline(xintercept = 2000, linetype = 'dashed', colour = 'red', alpha = .5) + 
+  # facet_wrap(~MODTYPE) +
+  theme_bw() +
+  ggtitle(paste0(var_title, ' concentration \nmeasured at the Gulf site (mg/l)')) +
+  xlab('Water year') + ylab('Concentration (mg/l)') +
+  labs(caption = "Data source: Casey Lee, 2022, USGS (https://doi.org/10.5066/P9G0EEUE)")
+
+
+library(ggpubr)
+ggarrange(p1, p2)
+
+fname <- paste0(dir.fig, 'SM_', var, ' loads to the Gulf.png'); fname
+ggsave(filename = fname, plot = last_plot(), width = 8, height = 5, units = 'in', dpi = 300)
+```
+  

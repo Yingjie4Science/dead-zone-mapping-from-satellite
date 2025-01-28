@@ -444,11 +444,12 @@ ggsave(filename = pname, plot = last_plot(), width = 7*1.5, height = 4*1.5, unit
 ### For each agency, sampling date 
 levels(do_bottom$Source)
 
+source_i <- 'SEAMAP'
+source_i <- 'LUMCON'
 
 do_bottom %>%
   # dplyr::filter(nchar(YEID) < 10) %>%
-  # dplyr::filter(Source == 'LUMCON') %>%
-  dplyr::filter(Source == 'SEAMAP') %>%
+  dplyr::filter(Source == source_i) %>%
   ungroup() %>%
   distinct(YEID, Date, .keep_all = T) %>%
   dplyr::mutate(mm = month(Date)) %>%
@@ -465,8 +466,11 @@ do_bottom %>%
   facet_wrap(~Year) + ## , scales = 'free_x'
   theme_bw() +
   # theme(axis.text.x = element_text(angle = 45, hjust = 1,vjust = 0.5)) +
-  ggtitle('Number of sample locations by month') + 
+  ggtitle(paste0('Number of sample locations by month - ', source_i)) + 
   ylab('Count') + xlab("Month")
+
+pname <- paste0(dir.fig, 'SM_Number of samples by date and Source - ', source_i, '.png'); pname
+ggsave(filename = pname, plot = last_plot(), width = 7*1.5, height = 4*1.5, units = 'in', dpi = 300)
 ```
 
 

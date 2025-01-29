@@ -76,7 +76,9 @@ ggplot(df, aes(x = Percentile, y = Value)) +
   Casey Lee, 2022, Nutrient loads to the Gulf of Mexico produced by the USGS National Water Quality Network, 1968-2021: U.S. Geological Survey, https://doi.org/10.5066/P9G0EEUE.
   
   
-  #`SITE_ABB`: A text abbreviation of the site name primarily for use within the National Water Quality Program											
+  `SITE_ABB`: A text abbreviation of the site name primarily for use within the National Water Quality Program			
+  
+  **GULF**, which represents the *combined annual flows* to the Gulf of Mexico (based on the combined flows from the Mississippi River at Tarbert Landing and the Atchafalaya River at Simmesport).
   
   									
   `CONSTIT`: A character abbreviation indicative of the water-quality constituent being reported. Values include 
@@ -115,7 +117,7 @@ unique(d$CONSTIT)
 unique(d$MODTYPE)
 
 var <- 'TN'
-# var <- 'TP'
+var <- 'TP'
 
 if(var == 'TN'){
   var_title <- 'Total nitrogen'
@@ -125,31 +127,34 @@ if(var == 'TN'){
   warning('Please provide more information!')
 }
 
-d_tn <- d %>%
+d_var <- d %>%
   filter(SITE_ABB == 'GULF',
          CONSTIT == var,
          MODTYPE == 'WRTDS_FNS',
-         WY >= 1990 & WY <= 2020)
+         WY >= 1990,
+         WY <= 2020)
 
-p1 <- d_tn %>%
+p1 <- d_var %>%
   ggplot(aes(x = WY, y = TONS)) +
   geom_point(size = 3, color = "blue") +
   geom_line(group = 1, color = "blue") +
-  geom_vline(xintercept = 2000, linetype = 'dashed', color = 'red', alpha = .5) + 
+  geom_vline(xintercept = 2000, linetype = 'dashed', colour = 'pink', alpha = .5) + 
+  geom_vline(xintercept = 2002, linetype = 'dashed', colour = 'red', alpha = .5) + 
   # facet_wrap(~MODTYPE) +
   theme_bw() +
-  ggtitle(paste0(var_title, ' load \nmeasured at the Gulf site (tons)')) +
+  ggtitle(paste0(var_title, ' load \nmeasured to the Gulf (tons)')) +
   xlab('Water year') + ylab('Load (tons)') +
   labs(caption = "")
 
-p2 <- d_tn %>%
+p2 <- d_var %>%
   ggplot(aes(x = WY, y = CONC)) +
   geom_point(size = 3, color = "blue") +
   geom_line(group = 1, color = "blue") +
-  geom_vline(xintercept = 2000, linetype = 'dashed', colour = 'red', alpha = .5) + 
+  geom_vline(xintercept = 2000, linetype = 'dashed', colour = 'pink', alpha = .5) + 
+  geom_vline(xintercept = 2002, linetype = 'dashed', colour = 'red', alpha = .5) + 
   # facet_wrap(~MODTYPE) +
   theme_bw() +
-  ggtitle(paste0(var_title, ' concentration \nmeasured at the Gulf site (mg/l)')) +
+  ggtitle(paste0(var_title, ' concentration \nmeasured to the Gulf (mg/l)')) +
   xlab('Water year') + ylab('Concentration (mg/l)') +
   labs(caption = "Data source: Casey Lee, 2022, USGS (https://doi.org/10.5066/P9G0EEUE)")
 

@@ -1,0 +1,999 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<metadata>
+  <idinfo>
+    <citation>
+      <citeinfo>
+        <origin>Casey Lee</origin>
+        <pubdate>2022</pubdate>
+        <title>Nutrient loads to the Gulf of Mexico produced by the USGS National Water Quality Network, 1968-2021</title>
+        <geoform>The data are contained in 6 comma delimited files</geoform>
+        <pubinfo>
+          <pubplace>Science Base</pubplace>
+          <publish>U.S. Geological Survey</publish>
+        </pubinfo>
+        <onlink>https://doi.org/10.5066/P9G0EEUE</onlink>
+      </citeinfo>
+    </citation>
+    <descript>
+      <abstract>The National Water Quality Network (NWQN) for Rivers and Streams includes 110 surface-water river and stream sites monitored by the U.S. Geological Survey (USGS) National Water Quality Program. This data release provides streamflow, nutrient, and sediment data collected and analyzed by NWQN for sites used to represent contributions to the Gulf of Mexico from 1968-2021.  This dataset includes daily, monthly, and annual summaries of streamflow conditions, discrete water-quality concentrations, monthly and annual water-quality loads, and information on water-quality trends.  Data from this release will be presented on the USGS ScienceBase platform.</abstract>
+      <purpose>Data collected by the U.S. Geological Survey (USGS) National Water Quality Network (NWQN) are used to characterize the status and trends of water quality throughout the United States.  
+Primary objectives of the NWQN are to:  
+• determine the status and trends of loads and concentrations of contaminants, nutrients, and sediment in the Nation's large rivers, including loads to selected major estuaries;  
+• determine the status and trends of concentrations of contaminants, nutrients, and sediment for selected wadeable streams in selected land-use and environmental settings; and  
+
+In an effort to meet these objectives, the USGS annually releases nutrient and pesticide concentration and load data collected from the NWQN.  This release is specifically for data representing contributions to the Gulf of Mexico.</purpose>
+      <supplinf>This publication supersedes data from three sites from a previous data release "Nutrient and pesticide data collected from the USGS National Water Quality Network and previous networks, 1950-2020 (https://www.sciencebase.gov/catalog/item/617987dbd34ea58c3c6fa16e)</supplinf>
+    </descript>
+    <timeperd>
+      <timeinfo>
+        <rngdates>
+          <begdate>19681001</begdate>
+          <enddate>20210930</enddate>
+        </rngdates>
+      </timeinfo>
+      <current>ground condition</current>
+    </timeperd>
+    <status>
+      <progress>In work</progress>
+      <update>Annually</update>
+    </status>
+    <spdom>
+      <bounding>
+        <westbc>-179.16601526216</westbc>
+        <eastbc>-58.095703126298</eastbc>
+        <northbc>72.328996908904</northbc>
+        <southbc>6.4458829858152</southbc>
+      </bounding>
+    </spdom>
+    <keywords>
+      <theme>
+        <themekt>USGS Thesaurus</themekt>
+        <themekey>nutrient content</themekey>
+        <themekey>sediment transport</themekey>
+        <themekey>streamflow</themekey>
+        <themekey>water quality</themekey>
+        <themekey>river systems</themekey>
+      </theme>
+      <place>
+        <placekt>Getty Thesaurus of Geographic Names</placekt>
+        <placekey>United States</placekey>
+      </place>
+    </keywords>
+    <accconst>None, however, acknowledgment of the U.S. Geological Survey would be appreciated in products derived from these data</accconst>
+    <useconst>Although there are no restrictions or legal prerequisites for using the data, users are advised to read the data set's metadata thoroughly to understand appropriate use and data limitations.</useconst>
+    <ptcontac>
+      <cntinfo>
+        <cntperp>
+          <cntper>Casey Lee</cntper>
+          <cntorg>USGS</cntorg>
+        </cntperp>
+        <cntaddr>
+          <addrtype>mailing and physical</addrtype>
+          <address>1217 Biltmore Drive</address>
+          <city>Lawrence</city>
+          <state>KS</state>
+          <postal>66049</postal>
+          <country>USA</country>
+        </cntaddr>
+        <cntvoice>785-832-3515</cntvoice>
+        <cntemail>cjlee@usgs.gov</cntemail>
+      </cntinfo>
+    </ptcontac>
+  </idinfo>
+  <dataqual>
+    <attracc>
+      <attraccr>A wide variety of tests were developed and implemented for these data.  These tests verified that data had reasonable minimum and maximum values, that the correct data were contained within each column, and that columns matched between data frames among other tests.  
+In addition data are plotted and were reviewed on the following site: http://nrtwq.usgs.gov/nwqn.</attraccr>
+    </attracc>
+    <logic>As stated in the attribute accuracy report: "A wide variety of tests were developed and implemented for these data.  These tests verified that the data had reasonable minimum and maximum values, that the correct data were contained within each column, and that columns matched between data frames among other tests".</logic>
+    <complete>Data set is considered complete for the information presented, as described in the abstract. Users are advised to read the rest of the metadata record for additional details.</complete>
+    <posacc>
+      <horizpa>
+        <horizpar>No formal positional accuracy tests were conducted</horizpar>
+      </horizpa>
+      <vertacc>
+        <vertaccr>No formal positional accuracy tests were conducted</vertaccr>
+      </vertacc>
+    </posacc>
+    <lineage>
+      <srcinfo>
+        <srccite>
+          <citeinfo>
+            <origin>U.S. Geological Survey National Water Information System</origin>
+            <pubdate>2022</pubdate>
+            <title>USGS streamflow and water-quality data</title>
+            <geoform>Obtained via webservices</geoform>
+            <pubinfo>
+              <pubplace>U.S. Geological Survey - National Water Information System; http://dx.doi.org/10.5066/F7P55KJN</pubplace>
+              <publish>USGS</publish>
+            </pubinfo>
+            <onlink>https://doi.org/10.5066/P9P2PF1N</onlink>
+          </citeinfo>
+        </srccite>
+        <typesrc>streamflow and water-quality data</typesrc>
+        <srctime>
+          <timeinfo>
+            <rngdates>
+              <begdate>19671001</begdate>
+              <enddate>20210930</enddate>
+            </rngdates>
+          </timeinfo>
+          <srccurr>https://doi.org/10.5066/P9P2PF1N</srccurr>
+        </srctime>
+        <srccitea>USGS NWIS</srccitea>
+        <srccontr>The raw data for everything contained herein</srccontr>
+      </srcinfo>
+      <procstep>
+        <procdesc>Process Step 1 
+Process description: Refers to aflow.csv.  Annual flows in this file are reported for each site and water year.  Annual flows were computed by converting daily flows reported in cubic feet per second, to acre-feet per day.  These data were then summed for each respective combination of site and water year.</procdesc>
+        <procdate>20220602</procdate>
+      </procstep>
+      <procstep>
+        <procdesc>Process Step 2 
+Process description: Refers to dflow.csv.  Daily flows in this file are reported for each site and date from 1968-2021.  Daily flows are obtained for each site from the USACE rivergages page: https://rivergages.mvr.usace.army.mil/WaterControl/new/layout.cfm.  In a few cases, small gaps (1-10 days) in daily flow data are interpolated to allow for load computations.</procdesc>
+        <procdate>20220602</procdate>
+      </procstep>
+      <procstep>
+        <procdesc>Process Step 3 
+Process description: Refers to discqw.csv.  Discrete water-quality data in this file are reported for each site and date from 1968-2021.   The USGS NWIS system (http://nwis.waterdata.usgs.gov/usa/nwis/qwdata) is the source of data in this file.  These data underwent additional processing steps before publication which are detailed here: https://nrtwq.usgs.gov/nwqn/#/TECH 
+
+Aulenbach, B.T., Buxton, H.T., Battaglin, W.A., and Coupe, R.H., 2007, Streamflow and nutrient fluxes of the Mississippi-Atchafalaya River Basin and subbasins for the period of record through 2005: U.S. Geological Survey Open-File Report 2007-1080, 
+http://toxics.usgs.gov/pubs/of-2007-1080/index.html 
+
+Lee, C.J., Murphy, J.C., Crawford, C.G., and Deacon, J.R, 2017, Methods for computing water-quality loads at sites in the U.S. Geological Survey National Water Quality Network (ver. 1.1, January 2020): U.S. Geological Survey Open-File Report 2017–1120, 20 p., https://doi.org/10.3133/ofr20171120.</procdesc>
+        <procdate>20220602</procdate>
+      </procstep>
+      <procstep>
+        <procdesc>Process Step 4 
+Process description: Refers to mflow.csv.   Monthly flow values reported in this file are reported for sites representative of contributions to the Gulf of Mexico from 1968-2021.  These data are published exclusively for sites in the Mississippi River Basin; monthly water-quality loads to the Gulf are used to predict the extent of the hypoxic zone in the Gulf of Mexico, see https://nrtwq.usgs.gov/nwqn/#/GULF_PRELIM for more details.  Monthly flows were computed by converting daily flows (see Process Step 2), reported in cubic feet per second, to acre-feet per day.  These data were then summed for each month and water year at each site.</procdesc>
+        <procdate>20220602</procdate>
+      </procstep>
+      <procstep>
+        <procdesc>Process Step 5 
+Process description: Refers to WRTDStrends.csv.   Trends in annual, flow-normalized water-quality loads are computed using the Weighted Regressions on Time, Discharge, and Season method (WRTDS) among the most recent water year and previous years when adequate discrete water-quality and streamflow information is available.  Trends are computed among the most recent water year and consecutive decades prior to the most recent water year (i.e. 1981, 1991, 2001, and 2011 if the most recent water year is 2021) when adequate data is available, and from 1980-1996 relative to 2021 for total nitrogen and total phosphorus contributions to the Gulf. Details regarding load computation methods are available at Lee and others (2017). 
+
+Lee, C.J., Murphy, J.C., Crawford, C.G., and Deacon, J.R, 2017, Methods for computing water-quality loads at sites in the U.S. Geological Survey National Water Quality Network (ver. 1.1, January 2020): U.S. Geological Survey Open-File Report 2017–1120, 20 p., https://doi.org/10.3133/ofr20171120.</procdesc>
+        <procdate>20220603</procdate>
+      </procstep>
+      <procstep>
+        <procdesc>Process Step 6 
+Process description: Refers to WRTDSloads.csv.  Annual and flow-normalized water-quality loads are computed using the Weighted Regressions on Time, Discharge, and Season method (WRTDS) method for sites representative of contributions to the Gulf of Mexico and for constituents and water years from 1968-2021 when adequate discrete water-quality and streamflow information is available.  Details regarding load computation methods are available at Lee and others (2017). 
+
+Lee, C.J., Murphy, J.C., Crawford, C.G., and Deacon, J.R, 2017, Methods for computing water-quality loads at sites in the U.S. Geological Survey National Water Quality Network (ver. 1.1, January 2020): U.S. Geological Survey Open-File Report 2017–1120, 20 p., https://doi.org/10.3133/ofr20171120.</procdesc>
+        <procdate>20220602</procdate>
+      </procstep>
+    </lineage>
+  </dataqual>
+  <eainfo>
+    <detailed>
+      <enttyp>
+        <enttypl>aflow.csv</enttypl>
+        <enttypd>The annual flow transported past each NWQN site, in acre-feet</enttypd>
+        <enttypds>USGS Observing Systems Division - National Water Quality Monitoring Network</enttypds>
+      </enttyp>
+      <attr>
+        <attrlabl>"SITE_ABB"</attrlabl>
+        <attrdef>A text abbreviation of the site name, primarily for use within the National Water Quality Network.</attrdef>
+        <attrdefs>Producer defined</attrdefs>
+        <attrdomv>
+          <udom>This code is typically the first four characters of the site location.</udom>
+        </attrdomv>
+      </attr>
+      <attr>
+        <attrlabl>SITE_QW_ID</attrlabl>
+        <attrdef>Unique USGS station number indicating location where water-quality samples are collected.</attrdef>
+        <attrdefs>U.S. Geological Survey - National Water Information System; Site Information; http://dx.doi.org/10.5066/F7P55KJN</attrdefs>
+        <attrdomv>
+          <udom>USGS station numbers represent either a geographic location, represented by latitude and longitude of 15-digits, or an 8-digit or more network sequence number.  One exception to this rule is "GULF", which represents the combined annual flows to the Gulf of Mexico (based on the combined flows from the Mississippi River at Tarbert Landing and the Atchafalaya River at Simmesport).</udom>
+        </attrdomv>
+      </attr>
+      <attr>
+        <attrlabl>SITE_FLOW_ID</attrlabl>
+        <attrdef>U.S. Army Corps of Engineers site number</attrdef>
+        <attrdefs>U.S. Army Corps of Engineers site identification number, information from https://rivergages.mvr.usace.army.mil/WaterControl/new/layout.cfm</attrdefs>
+        <attrdomv>
+          <udom>U.S. Army Corps of Engineers site identification number.  An exception to this rule is "GULF", which represents the combined annual flows to the Gulf of Mexico (based on the combined flows from the Mississippi River at Tarbert Landing and the Atchafalaya River at Simmesport).</udom>
+        </attrdomv>
+      </attr>
+      <attr>
+        <attrlabl>WY</attrlabl>
+        <attrdef>A numeric identifier of the water year in which data were recorded.</attrdef>
+        <attrdefs>Producer defined</attrdefs>
+        <attrdomv>
+          <rdom>
+            <rdommin>1968</rdommin>
+            <rdommax>2021</rdommax>
+            <attrunit>years</attrunit>
+          </rdom>
+        </attrdomv>
+      </attr>
+      <attr>
+        <attrlabl>FLOW</attrlabl>
+        <attrdef>A numeric identifier of the volume of water transported for a given water year, in acre-feet.</attrdef>
+        <attrdefs>U.S. Geological Survey - National Water Information System; Surface water; http://dx.doi.org/10.5066/F7P55KJN</attrdefs>
+        <attrdomv>
+          <rdom>
+            <rdommin>93700000</rdommin>
+            <rdommax>1000000000</rdommax>
+            <attrunit>acre-feet</attrunit>
+          </rdom>
+        </attrdomv>
+      </attr>
+    </detailed>
+    <detailed>
+      <enttyp>
+        <enttypl>dflow.csv</enttypl>
+        <enttypd>The daily flow at each NWQN site, in cubic feet per second</enttypd>
+        <enttypds>U.S. Geological Survey - National Water Information System; Surface water; http://dx.doi.org/10.5066/F7P55KJN</enttypds>
+      </enttyp>
+      <attr>
+        <attrlabl>SITE_ABB</attrlabl>
+        <attrdef>A text abbreviation of the site name, primarily for use within the National Water Quality Network.</attrdef>
+        <attrdefs>Producer defined</attrdefs>
+        <attrdomv>
+          <udom>This code is typically the first four characters of the site location.</udom>
+        </attrdomv>
+      </attr>
+      <attr>
+        <attrlabl>SITE_QW_ID</attrlabl>
+        <attrdef>Unique USGS station number indicating location where water-quality samples are collected.</attrdef>
+        <attrdefs>U.S. Geological Survey - National Water Information System; Site Information; http://dx.doi.org/10.5066/F7P55KJN</attrdefs>
+        <attrdomv>
+          <udom>USGS station numbers represent either a geographic location, represented by latitude and longitude of 15-digits, or an 8-digit or more network sequence number.</udom>
+        </attrdomv>
+      </attr>
+      <attr>
+        <attrlabl>SITE_FLOW_ID</attrlabl>
+        <attrdef>U.S. Army Corps of Engineers site number</attrdef>
+        <attrdefs>U.S. Army Corps of Engineers site identification number, information from https://rivergages.mvr.usace.army.mil/WaterControl/new/layout.cfm</attrdefs>
+        <attrdomv>
+          <udom>U.S. Army Corps of Engineers site identification number</udom>
+        </attrdomv>
+      </attr>
+      <attr>
+        <attrlabl>DATE</attrlabl>
+        <attrdef>Date, defined as YYYY-MM-DD</attrdef>
+        <attrdefs>Date</attrdefs>
+        <attrdomv>
+          <codesetd>
+            <codesetn>Date</codesetn>
+            <codesets>Date</codesets>
+          </codesetd>
+        </attrdomv>
+      </attr>
+      <attr>
+        <attrlabl>FLOW</attrlabl>
+        <attrdef>Streamflow, in cubic feet per second.  Values are primarily positive, but may be negative at sites influenced by tidal flow.</attrdef>
+        <attrdefs>U.S. Geological Survey - National Water Information System; Surface water; http://dx.doi.org/10.5066/F7P55KJN</attrdefs>
+        <attrdomv>
+          <rdom>
+            <rdommin>22000</rdommin>
+            <rdommax>1619000</rdommax>
+            <attrunit>cubic feet per second</attrunit>
+          </rdom>
+        </attrdomv>
+      </attr>
+      <attr>
+        <attrlabl>WY</attrlabl>
+        <attrdef>A numeric identifier of the water year in which data were recorded.</attrdef>
+        <attrdefs>Producer defined</attrdefs>
+        <attrdomv>
+          <rdom>
+            <rdommin>1968</rdommin>
+            <rdommax>2021</rdommax>
+            <attrunit>water year</attrunit>
+          </rdom>
+        </attrdomv>
+      </attr>
+    </detailed>
+    <detailed>
+      <enttyp>
+        <enttypl>discqw.csv</enttypl>
+        <enttypd>Discrete water-quality results from samples collected at NWQN sites</enttypd>
+        <enttypds>U.S. Geological Survey - National Water Information System; Water quality; http://dx.doi.org/10.5066/F7P55KJN</enttypds>
+      </enttyp>
+      <attr>
+        <attrlabl>SITE_ABB</attrlabl>
+        <attrdef>A text abbreviation of the site name, primarily for use within the National Water Quality Network.</attrdef>
+        <attrdefs>Producer defined</attrdefs>
+        <attrdomv>
+          <udom>This code is typically the first four characters of the site location.</udom>
+        </attrdomv>
+      </attr>
+      <attr>
+        <attrlabl>SITE_QW_ID</attrlabl>
+        <attrdef>Unique USGS station number indicating location where water-quality samples are collected.</attrdef>
+        <attrdefs>U.S. Geological Survey - National Water Information System; Site Information; http://dx.doi.org/10.5066/F7P55KJN</attrdefs>
+        <attrdomv>
+          <udom>USGS station numbers represent either a geographic location, represented by latitude and longitude of 15-digits, or an 8-digit or more network sequence number.</udom>
+        </attrdomv>
+      </attr>
+      <attr>
+        <attrlabl>SITE_FLOW_ID</attrlabl>
+        <attrdef>U.S. Army Corps of Engineers site number.</attrdef>
+        <attrdefs>U.S. Army Corps of Engineers site identification number, information from https://rivergages.mvr.usace.army.mil/WaterControl/new/layout.cfm</attrdefs>
+        <attrdomv>
+          <udom>U.S. Army Corps of Engineers site identification number.</udom>
+        </attrdomv>
+      </attr>
+      <attr>
+        <attrlabl>CONSTIT</attrlabl>
+        <attrdef>A character abbreviation indicative of the water-quality constituent being reported.</attrdef>
+        <attrdefs>Producer defined</attrdefs>
+        <attrdomv>
+          <edom>
+            <edomv>TN</edomv>
+            <edomvd>Total nitrogen</edomvd>
+            <edomvds>Producer defined</edomvds>
+          </edom>
+        </attrdomv>
+        <attrdomv>
+          <edom>
+            <edomv>SSC</edomv>
+            <edomvd>Suspended-sediment concentration</edomvd>
+            <edomvds>Producer defined</edomvds>
+          </edom>
+        </attrdomv>
+        <attrdomv>
+          <edom>
+            <edomv>NO3_NO2</edomv>
+            <edomvd>Nitrate plus nitrite</edomvd>
+            <edomvds>Producer defined</edomvds>
+          </edom>
+        </attrdomv>
+        <attrdomv>
+          <edom>
+            <edomv>TP</edomv>
+            <edomvd>Total phosphorus</edomvd>
+            <edomvds>Producer defined</edomvds>
+          </edom>
+        </attrdomv>
+        <attrdomv>
+          <edom>
+            <edomv>NH3</edomv>
+            <edomvd>Ammonia</edomvd>
+            <edomvds>Producer defined</edomvds>
+          </edom>
+        </attrdomv>
+        <attrdomv>
+          <edom>
+            <edomv>OP</edomv>
+            <edomvd>Orthophosphate</edomvd>
+            <edomvds>Producer defined</edomvds>
+          </edom>
+        </attrdomv>
+        <attrdomv>
+          <edom>
+            <edomv>SI</edomv>
+            <edomvd>Dissolved silica</edomvd>
+            <edomvds>Producer defined</edomvds>
+          </edom>
+        </attrdomv>
+        <attrdomv>
+          <edom>
+            <edomv>DOC</edomv>
+            <edomvd>Dissolved organic carbon</edomvd>
+            <edomvds>Producer defined</edomvds>
+          </edom>
+        </attrdomv>
+        <attrdomv>
+          <edom>
+            <edomv>CHL</edomv>
+            <edomvd>Dissolved chloride</edomvd>
+            <edomvds>Producer defined</edomvds>
+          </edom>
+        </attrdomv>
+        <attrdomv>
+          <edom>
+            <edomv>TDS</edomv>
+            <edomvd>Total dissolved solids</edomvd>
+            <edomvds>Producer defined</edomvds>
+          </edom>
+        </attrdomv>
+      </attr>
+      <attr>
+        <attrlabl>DATE</attrlabl>
+        <attrdef>Date, defined as YYYY-MM-DD</attrdef>
+        <attrdefs>Date</attrdefs>
+        <attrdomv>
+          <codesetd>
+            <codesetn>Date</codesetn>
+            <codesets>Date</codesets>
+          </codesetd>
+        </attrdomv>
+      </attr>
+      <attr>
+        <attrlabl>WY</attrlabl>
+        <attrdef>A numeric identifier of the water year in which data were recorded.</attrdef>
+        <attrdefs>Producer defined</attrdefs>
+        <attrdomv>
+          <rdom>
+            <rdommin>1968</rdommin>
+            <rdommax>2021</rdommax>
+            <attrunit>water year</attrunit>
+          </rdom>
+        </attrdomv>
+      </attr>
+      <attr>
+        <attrlabl>CONCENTRATION</attrlabl>
+        <attrdef>Water-quality constituent concentration in milligrams per liter</attrdef>
+        <attrdefs>U.S. Geological Survey - National Water Information System; Water quality; http://dx.doi.org/10.5066/F7P55KJN</attrdefs>
+        <attrdomv>
+          <rdom>
+            <rdommin>0.001</rdommin>
+            <rdommax>1480</rdommax>
+            <attrunit>milligrams per liter</attrunit>
+          </rdom>
+        </attrdomv>
+      </attr>
+      <attr>
+        <attrlabl>REMARK</attrlabl>
+        <attrdef>Character qualifier of concentration values</attrdef>
+        <attrdefs>U.S. Geological Survey - National Water Information System; Water quality; http://dx.doi.org/10.5066/F7P55KJN</attrdefs>
+        <attrdomv>
+          <edom>
+            <edomv>""</edomv>
+            <edomvd>No qualifier</edomvd>
+            <edomvds>U.S. Geological Survey - National Water Information System; Water quality; http://dx.doi.org/10.5066/F7P55KJN</edomvds>
+          </edom>
+        </attrdomv>
+        <attrdomv>
+          <edom>
+            <edomv>"&lt;"</edomv>
+            <edomvd>The result is less than the value reported in the CONCENTRATION field</edomvd>
+            <edomvds>U.S. Geological Survey - National Water Information System; Water quality; http://dx.doi.org/10.5066/F7P55KJN</edomvds>
+          </edom>
+        </attrdomv>
+      </attr>
+    </detailed>
+    <detailed>
+      <enttyp>
+        <enttypl>mflow.csv</enttypl>
+        <enttypd>Monthly flow transported past NWQN monitoring sites, in acre-feet</enttypd>
+        <enttypds>USGS Observing Systems Division - National Water Quality Monitoring Network</enttypds>
+      </enttyp>
+      <attr>
+        <attrlabl>SITE_ABB</attrlabl>
+        <attrdef>A text abbreviation of the site name, primarily for use within the National Water Quality Network.</attrdef>
+        <attrdefs>Producer defined</attrdefs>
+        <attrdomv>
+          <udom>This code is typically the first four characters of the site location.</udom>
+        </attrdomv>
+      </attr>
+      <attr>
+        <attrlabl>SITE_QW_ID</attrlabl>
+        <attrdef>Unique USGS station number indicating location where water-quality samples are collected.</attrdef>
+        <attrdefs>U.S. Geological Survey - National Water Information System; Site Information; http://dx.doi.org/10.5066/F7P55KJN</attrdefs>
+        <attrdomv>
+          <udom>USGS station numbers represent either a geographic location, represented by latitude and longitude of 15-digits, or an 8-digit or more network sequence number.  One exception to this rule is "GULF", which represents the combined annual flows to the Gulf of Mexico (based on the combined flows from the Mississippi River at Tarbert Landing and the Atchafalaya River at Simmesport).</udom>
+        </attrdomv>
+      </attr>
+      <attr>
+        <attrlabl>SITE_FLOW_ID</attrlabl>
+        <attrdef>U.S. Army Corps of Engineers site number.</attrdef>
+        <attrdefs>U.S. Army Corps of Engineers site identification number, information from https://rivergages.mvr.usace.army.mil/WaterControl/new/layout.cfm</attrdefs>
+        <attrdomv>
+          <udom>U.S. Army Corps of Engineers site identification number.  An exception to this rule is "GULF", which represents the combined annual flows to the Gulf of Mexico (based on the combined flows from the Mississippi River at Tarbert Landing and the Atchafalaya River at Simmesport).</udom>
+        </attrdomv>
+      </attr>
+      <attr>
+        <attrlabl>WY</attrlabl>
+        <attrdef>A numeric identifier of the water year in which data were recorded.</attrdef>
+        <attrdefs>Producer defined</attrdefs>
+        <attrdomv>
+          <rdom>
+            <rdommin>1968</rdommin>
+            <rdommax>2021</rdommax>
+            <attrunit>Water years</attrunit>
+          </rdom>
+        </attrdomv>
+      </attr>
+      <attr>
+        <attrlabl>MONTH</attrlabl>
+        <attrdef>A numeric identifier of the month in which data were recorded.</attrdef>
+        <attrdefs>Producer defined.</attrdefs>
+        <attrdomv>
+          <rdom>
+            <rdommin>1</rdommin>
+            <rdommax>12</rdommax>
+            <attrunit>Month</attrunit>
+          </rdom>
+        </attrdomv>
+      </attr>
+      <attr>
+        <attrlabl>FLOW</attrlabl>
+        <attrdef>The volume of water transported past the site, in acre-feet. Values are primarily positive, but may be negative at sites influenced by tidal flow.</attrdef>
+        <attrdefs>U.S. Geological Survey - National Water Information System; Surface water; http://dx.doi.org/10.5066/F7P55KJN</attrdefs>
+        <attrdomv>
+          <rdom>
+            <rdommin>2540000</rdommin>
+            <rdommax>129000000</rdommax>
+            <attrunit>acre-feet</attrunit>
+          </rdom>
+        </attrdomv>
+      </attr>
+    </detailed>
+    <detailed>
+      <enttyp>
+        <enttypl>WRTDStrends.csv</enttypl>
+        <enttypd>Trends in stationary and generalized annual flow-normalized water-quality concentrations and loads to the Gulf of Mexico (see Lee and others, 2017 for more details)</enttypd>
+        <enttypds>USGS Observing Systems Division - National Water Quality Monitoring Network</enttypds>
+      </enttyp>
+      <attr>
+        <attrlabl>SITE_ABB</attrlabl>
+        <attrdef>A text abbreviation of the site name, primarily for use within the National Water Quality Network.</attrdef>
+        <attrdefs>Producer defined</attrdefs>
+        <attrdomv>
+          <udom>This code is typically the first four characters of the site location.</udom>
+        </attrdomv>
+      </attr>
+      <attr>
+        <attrlabl>SITE_QW_ID</attrlabl>
+        <attrdef>Unique USGS station number indicating location where water-quality samples are collected.</attrdef>
+        <attrdefs>U.S. Geological Survey - National Water Information System; Site Information; http://dx.doi.org/10.5066/F7P55KJN</attrdefs>
+        <attrdomv>
+          <udom>USGS station numbers represent either a geographic location, represented by latitude and longitude of 15-digits, or an 8-digit or more network sequence number.  One exception to this rule is "GULF", which represents the combined annual flows to the Gulf of Mexico (based on the combined flows from the Mississippi River at Tarbert Landing and the Atchafalaya River at Simmesport).</udom>
+        </attrdomv>
+      </attr>
+      <attr>
+        <attrlabl>SITE_FLOW_ID</attrlabl>
+        <attrdef>U.S. Army Corps of Engineers site identification number</attrdef>
+        <attrdefs>U.S. Army Corps of Engineers site identification number, information from https://rivergages.mvr.usace.army.mil/WaterControl/new/layout.cfm</attrdefs>
+        <attrdomv>
+          <udom>U.S. Army Corps of Engineers site identification number.  An exception to this rule is "GULF", which represents the combined annual flows to the Gulf of Mexico (based on the combined flows from the Mississippi River at Tarbert Landing and the Atchafalaya River at Simmesport).</udom>
+        </attrdomv>
+      </attr>
+      <attr>
+        <attrlabl>CONSTIT</attrlabl>
+        <attrdef>A character abbreviation indicative of the water-quality constituent being reported.</attrdef>
+        <attrdefs>Producer defined</attrdefs>
+        <attrdomv>
+          <edom>
+            <edomv>NH3</edomv>
+            <edomvd>Ammonia</edomvd>
+            <edomvds>Producer defined</edomvds>
+          </edom>
+        </attrdomv>
+        <attrdomv>
+          <edom>
+            <edomv>NO3_NO2</edomv>
+            <edomvd>Nitrate plus nitrate</edomvd>
+            <edomvds>Producer defined</edomvds>
+          </edom>
+        </attrdomv>
+        <attrdomv>
+          <edom>
+            <edomv>TN</edomv>
+            <edomvd>Total nitrogen</edomvd>
+            <edomvds>Producer defined</edomvds>
+          </edom>
+        </attrdomv>
+        <attrdomv>
+          <edom>
+            <edomv>TP</edomv>
+            <edomvd>Total phosphorus</edomvd>
+            <edomvds>Producer defined</edomvds>
+          </edom>
+        </attrdomv>
+        <attrdomv>
+          <edom>
+            <edomv>OP</edomv>
+            <edomvd>Orthophosphate</edomvd>
+            <edomvds>Producer defined</edomvds>
+          </edom>
+        </attrdomv>
+        <attrdomv>
+          <edom>
+            <edomv>SI</edomv>
+            <edomvd>Dissolved silica</edomvd>
+            <edomvds>Producer defined</edomvds>
+          </edom>
+        </attrdomv>
+        <attrdomv>
+          <edom>
+            <edomv>SSC</edomv>
+            <edomvd>Suspended sediment</edomvd>
+            <edomvds>Producer defined</edomvds>
+          </edom>
+        </attrdomv>
+        <attrdomv>
+          <edom>
+            <edomv>DOC</edomv>
+            <edomvd>Dissolved organic carbon</edomvd>
+            <edomvds>Producer defined</edomvds>
+          </edom>
+        </attrdomv>
+        <attrdomv>
+          <edom>
+            <edomv>CHL</edomv>
+            <edomvd>Dissolved chloride</edomvd>
+            <edomvds>Producer defined</edomvds>
+          </edom>
+        </attrdomv>
+        <attrdomv>
+          <edom>
+            <edomv>TDS</edomv>
+            <edomvd>Total dissolved solids</edomvd>
+            <edomvds>Producer defined</edomvds>
+          </edom>
+        </attrdomv>
+      </attr>
+      <attr>
+        <attrlabl>WY1</attrlabl>
+        <attrdef>A numeric identifier of the water year representing the beginning of the trend period.  Will be represented by a single water year with the exception for trends to the Gulf of Mexico (SITE_ABB = GULF), which will be represented by the mean of 1980-1996.  For this case WY1 will be "1980-1996".</attrdef>
+        <attrdefs>Producer defined</attrdefs>
+        <attrdomv>
+          <rdom>
+            <rdommin>1981</rdommin>
+            <rdommax>2011</rdommax>
+            <attrunit>years</attrunit>
+          </rdom>
+        </attrdomv>
+      </attr>
+      <attr>
+        <attrlabl>WY2</attrlabl>
+        <attrdef>A numeric identifier of the water year representing the end of the trend period.</attrdef>
+        <attrdefs>Producer defined</attrdefs>
+        <attrdomv>
+          <rdom>
+            <rdommin>2021</rdommin>
+            <rdommax>2021</rdommax>
+            <attrunit>Years</attrunit>
+          </rdom>
+        </attrdomv>
+      </attr>
+      <attr>
+        <attrlabl>MODTYPE</attrlabl>
+        <attrdef>An indicator of whether the trend applies to generalized or stationary flow-normalized concentrations or loads (see Lee and others, 2017, for more details)</attrdef>
+        <attrdefs>Producer defined</attrdefs>
+        <attrdomv>
+          <edom>
+            <edomv>WRTDS_FNG</edomv>
+            <edomvd>Trend applies to generalized, flow-normalized annual loads or concentrations</edomvd>
+            <edomvds>Producer defined</edomvds>
+          </edom>
+        </attrdomv>
+        <attrdomv>
+          <edom>
+            <edomv>WRTDS_FNS</edomv>
+            <edomvd>Trend applies to stationary, flow-normalized annual loads or concentrations</edomvd>
+            <edomvds>Producer defined</edomvds>
+          </edom>
+        </attrdomv>
+      </attr>
+      <attr>
+        <attrlabl>PERC_L</attrlabl>
+        <attrdef>Percentage change in annual, flow-normalized loads among water years</attrdef>
+        <attrdefs>Producer defined</attrdefs>
+        <attrdomv>
+          <rdom>
+            <rdommin>-86</rdommin>
+            <rdommax>25</rdommax>
+            <attrunit>Percent</attrunit>
+          </rdom>
+        </attrdomv>
+      </attr>
+      <attr>
+        <attrlabl>PERC_L_L90</attrlabl>
+        <attrdef>Lower 90-percent confidence interval of the trend in annual flow-normalized loads among water years.</attrdef>
+        <attrdefs>Producer defined</attrdefs>
+        <attrdomv>
+          <rdom>
+            <rdommin>-112</rdommin>
+            <rdommax>15</rdommax>
+            <attrunit>Percent</attrunit>
+          </rdom>
+        </attrdomv>
+      </attr>
+      <attr>
+        <attrlabl>PERC_L_U90</attrlabl>
+        <attrdef>Upper 90-percent confidence interval of the trend in flow-normalized loads among water years</attrdef>
+        <attrdefs>Producer defined</attrdefs>
+        <attrdomv>
+          <rdom>
+            <rdommin>-69</rdommin>
+            <rdommax>40</rdommax>
+            <attrunit>Percent</attrunit>
+          </rdom>
+        </attrdomv>
+      </attr>
+      <attr>
+        <attrlabl>PERC_C</attrlabl>
+        <attrdef>Percentage change in annual flow-normalized concentrations among water years</attrdef>
+        <attrdefs>Producer defined</attrdefs>
+        <attrdomv>
+          <rdom>
+            <rdommin>-86</rdommin>
+            <rdommax>21</rdommax>
+            <attrunit>Percent</attrunit>
+          </rdom>
+        </attrdomv>
+      </attr>
+      <attr>
+        <attrlabl>PERC_C_L90</attrlabl>
+        <attrdef>Lower 90-percent confidence interval of the trend in flow-normalized concentration among water years</attrdef>
+        <attrdefs>Producer defined</attrdefs>
+        <attrdomv>
+          <rdom>
+            <rdommin>-109</rdommin>
+            <rdommax>7</rdommax>
+            <attrunit>Percent</attrunit>
+          </rdom>
+        </attrdomv>
+      </attr>
+      <attr>
+        <attrlabl>PERC_C_U90</attrlabl>
+        <attrdef>Upper 90-percent confidence interval of the trend flow-normalized concentration among water years</attrdef>
+        <attrdefs>Producer defined</attrdefs>
+        <attrdomv>
+          <rdom>
+            <rdommin>-70</rdommin>
+            <rdommax>37</rdommax>
+            <attrunit>Percent</attrunit>
+          </rdom>
+        </attrdomv>
+      </attr>
+    </detailed>
+    <detailed>
+      <enttyp>
+        <enttypl>WRTDSloads.csv</enttypl>
+        <enttypd>Annual and flow-normalized concentrations and loads computed using the WRTDS program (see Lee and others, 2017 for more information)</enttypd>
+        <enttypds>USGS Observing Systems Division - National Water Quality Monitoring Network</enttypds>
+      </enttyp>
+      <attr>
+        <attrlabl>SITE_ABB</attrlabl>
+        <attrdef>A text abbreviation of the site name, primarily for use within the National Water Quality Network.</attrdef>
+        <attrdefs>Producer defined</attrdefs>
+        <attrdomv>
+          <udom>This code is typically the first four characters of the site location.</udom>
+        </attrdomv>
+      </attr>
+      <attr>
+        <attrlabl>SITE_QW_ID</attrlabl>
+        <attrdef>Unique USGS station number indicating location where water-quality samples are collected.</attrdef>
+        <attrdefs>U.S. Geological Survey - National Water Information System; Site Information; http://dx.doi.org/10.5066/F7P55KJN</attrdefs>
+        <attrdomv>
+          <udom>USGS station numbers represent either a geographic location, represented by latitude and longitude of 15-digits, or an 8-digit or more network sequence number.  One exception to this rule is "GULF", which represents the combined annual flows to the Gulf of Mexico (based on the combined flows from the Mississippi River at Tarbert Landing and the Atchafalaya River at Simmesport).</udom>
+        </attrdomv>
+      </attr>
+      <attr>
+        <attrlabl>SITE_FLOW_ID</attrlabl>
+        <attrdef>U.S. Army Corps of Engineers site identification number.</attrdef>
+        <attrdefs>U.S. Army Corps of Engineers site identification number, information from https://rivergages.mvr.usace.army.mil/WaterControl/new/layout.cfm</attrdefs>
+        <attrdomv>
+          <udom>U.S. Army Corps of Engineers site identification number.  An exception to this rule is "GULF", which represents the combined annual flows to the Gulf of Mexico (based on the combined flows from the Mississippi River at Tarbert Landing and the Atchafalaya River at Simmesport).</udom>
+        </attrdomv>
+      </attr>
+      <attr>
+        <attrlabl>CONSTIT</attrlabl>
+        <attrdef>A character abbreviation indicative of the water-quality constituent being reported.</attrdef>
+        <attrdefs>Producer defined</attrdefs>
+        <attrdomv>
+          <edom>
+            <edomv>NH3</edomv>
+            <edomvd>Ammonia</edomvd>
+            <edomvds>Producer defined</edomvds>
+          </edom>
+        </attrdomv>
+        <attrdomv>
+          <edom>
+            <edomv>NO3_NO2</edomv>
+            <edomvd>Nitrate plus nitrite</edomvd>
+            <edomvds>Producer defined</edomvds>
+          </edom>
+        </attrdomv>
+        <attrdomv>
+          <edom>
+            <edomv>TN</edomv>
+            <edomvd>Total nitrogen</edomvd>
+            <edomvds>Producer defined</edomvds>
+          </edom>
+        </attrdomv>
+        <attrdomv>
+          <edom>
+            <edomv>TP</edomv>
+            <edomvd>Total phosphorus</edomvd>
+            <edomvds>Producer defined</edomvds>
+          </edom>
+        </attrdomv>
+        <attrdomv>
+          <edom>
+            <edomv>OP</edomv>
+            <edomvd>Orthophosphate</edomvd>
+            <edomvds>Producer defined</edomvds>
+          </edom>
+        </attrdomv>
+        <attrdomv>
+          <edom>
+            <edomv>SI</edomv>
+            <edomvd>Dissolved silica</edomvd>
+            <edomvds>Producer defined</edomvds>
+          </edom>
+        </attrdomv>
+        <attrdomv>
+          <edom>
+            <edomv>SSC</edomv>
+            <edomvd>Suspended sediment</edomvd>
+            <edomvds>Producer defined</edomvds>
+          </edom>
+        </attrdomv>
+        <attrdomv>
+          <edom>
+            <edomv>DOC</edomv>
+            <edomvd>Dissolved organic carbon</edomvd>
+            <edomvds>Producer defined</edomvds>
+          </edom>
+        </attrdomv>
+        <attrdomv>
+          <edom>
+            <edomv>CHL</edomv>
+            <edomvd>Dissolved chloride</edomvd>
+            <edomvds>Producer defined</edomvds>
+          </edom>
+        </attrdomv>
+        <attrdomv>
+          <edom>
+            <edomv>TDS</edomv>
+            <edomvd>Total dissolved solids</edomvd>
+            <edomvds>Producer defined</edomvds>
+          </edom>
+        </attrdomv>
+      </attr>
+      <attr>
+        <attrlabl>WY</attrlabl>
+        <attrdef>A numeric identifier of the water year in which data were recorded.</attrdef>
+        <attrdefs>Producer defined</attrdefs>
+        <attrdomv>
+          <rdom>
+            <rdommin>1967</rdommin>
+            <rdommax>2021</rdommax>
+            <attrunit>years</attrunit>
+          </rdom>
+        </attrdomv>
+      </attr>
+      <attr>
+        <attrlabl>MODTYPE</attrlabl>
+        <attrdef>An indicator of whether the trend applies to generalized or stationary flow-normalized concentrations or loads (see Lee and others, 2017, for more details)</attrdef>
+        <attrdefs>Producer defined</attrdefs>
+        <attrdomv>
+          <edom>
+            <edomv>WRTDS_K</edomv>
+            <edomvd>Actual annual load estimate computed using the WRTDS-K method (see Lee and others, 2017 for more details)</edomvd>
+            <edomvds>Producer defined</edomvds>
+          </edom>
+        </attrdomv>
+        <attrdomv>
+          <edom>
+            <edomv>WRTDS_FNG</edomv>
+            <edomvd>Generalized flow-normalized annual load estimate computed using the WRTDS program (see Lee and others, 2017 for more details)</edomvd>
+            <edomvds>Producer defined</edomvds>
+          </edom>
+        </attrdomv>
+        <attrdomv>
+          <edom>
+            <edomv>WRTDS_FNS</edomv>
+            <edomvd>Stationary flow-normalized annual load estimate computed using the WRTDS program (see Lee and others, 2017 for more details)</edomvd>
+            <edomvds>Producer defined</edomvds>
+          </edom>
+        </attrdomv>
+      </attr>
+      <attr>
+        <attrlabl>TONS</attrlabl>
+        <attrdef>Annual water-quality load or annual flow-normalized water-quality load, measured in tons (U.S.)</attrdef>
+        <attrdefs>Producer defined</attrdefs>
+        <attrdomv>
+          <rdom>
+            <rdommin>2570</rdommin>
+            <rdommax>190000000</rdommax>
+            <attrunit>Tons (U.S.)</attrunit>
+          </rdom>
+        </attrdomv>
+      </attr>
+      <attr>
+        <attrlabl>TONS_L90</attrlabl>
+        <attrdef>Lower 90 percent confidence interval about the annual water-quality load.  NA values indicate that confidence intervals were not able to be computed.</attrdef>
+        <attrdefs>Producer defined</attrdefs>
+        <attrdomv>
+          <rdom>
+            <rdommin>2510</rdommin>
+            <rdommax>165000000</rdommax>
+            <attrunit>Tons (U.S.)</attrunit>
+          </rdom>
+        </attrdomv>
+      </attr>
+      <attr>
+        <attrlabl>TONS_U90</attrlabl>
+        <attrdef>Upper 90 percent confidence interval about the annual water-quality load.  NA values indicate that confidence intervals were not able to be computed.</attrdef>
+        <attrdefs>Producer defined</attrdefs>
+        <attrdomv>
+          <rdom>
+            <rdommin>4520</rdommin>
+            <rdommax>211000000</rdommax>
+            <attrunit>Tons (U.S.)</attrunit>
+          </rdom>
+        </attrdomv>
+      </attr>
+      <attr>
+        <attrlabl>CONC</attrlabl>
+        <attrdef>Annual flow-normalized concentration, in milligrams per liter. NA values indicate that flow-normalized concentrations were not computed for this MODTYPE.</attrdef>
+        <attrdefs>Producer defined</attrdefs>
+        <attrdomv>
+          <rdom>
+            <rdommin>0.0106</rdommin>
+            <rdommax>287</rdommax>
+            <attrunit>milligrams per liter</attrunit>
+          </rdom>
+        </attrdomv>
+      </attr>
+      <attr>
+        <attrlabl>CONC_L90</attrlabl>
+        <attrdef>Lower 90-percent confidence interval in the flow-normalized concentration, in milligrams per liter. NA values indicate that flow-normalized concentrations were not computed for this MODTYPE.</attrdef>
+        <attrdefs>Producer defined</attrdefs>
+        <attrdomv>
+          <rdom>
+            <rdommin>0.00817</rdommin>
+            <rdommax>244</rdommax>
+            <attrunit>milligrams per liter</attrunit>
+          </rdom>
+        </attrdomv>
+      </attr>
+      <attr>
+        <attrlabl>CONC_U90</attrlabl>
+        <attrdef>Upper 90-percent confidence interval in the flow-normalized concentration, in milligrams per liter. NA values indicate that flow-normalized concentrations were not computed for this MODTYPE.</attrdef>
+        <attrdefs>Producer defined</attrdefs>
+        <attrdomv>
+          <rdom>
+            <rdommin>.0128</rdommin>
+            <rdommax>338</rdommax>
+            <attrunit>milligrams per liter</attrunit>
+          </rdom>
+        </attrdomv>
+      </attr>
+    </detailed>
+  </eainfo>
+  <distinfo>
+    <distrib>
+      <cntinfo>
+        <cntperp>
+          <cntper>Casey Lee</cntper>
+          <cntorg>U.S. Geological Survey - ScienceBase</cntorg>
+        </cntperp>
+        <cntaddr>
+          <addrtype>mailing and physical</addrtype>
+          <address>Denver Federal Center, Building 810, Mail Stop 302:</address>
+          <city>Denver</city>
+          <state>CO</state>
+          <postal>80225</postal>
+          <country>USA</country>
+        </cntaddr>
+        <cntvoice>1-888-275-8747</cntvoice>
+        <cntemail>sciencebase@usgs.gov</cntemail>
+      </cntinfo>
+    </distrib>
+    <distliab>Any use of trade, firm, or product names is for descriptive purposes only and does not imply endorsement by the U.S. Government. Although this information product, for the most part, is in the public domain, it also contains copyrighted materials as noted in the text. Permission to reproduce copyrighted items must be secured from the copyright owner whenever applicable. The data have been approved for release and publication by the U.S. Geological Survey (USGS). Although the data have been subjected to rigorous review and are substantially complete, the USGS reserves the right to revise the data pursuant to further analysis and review. Furthermore, the data are released on the condition that neither the USGS nor the U.S. Government may be held liable for any damages resulting from authorized or unauthorized use. Although the data have been processed successfully on a computer system at the U.S. Geological Survey, no warranty expressed or implied is made regarding the display or utility of the data on any other system, or for general or scientific purposes, nor shall the act of distribution constitute any such warranty. The U.S. Geological Survey shall not be held liable for improper or incorrect use of the data described and/or contained herein. Users of this data are advised to read all metadata and associated documentation thoroughly to understand appropriate use and data limitations.</distliab>
+    <techpreq>This zip file contains data available in a comma-delimited format.  The user must have software capable of uncompressing the zip file.</techpreq>
+  </distinfo>
+  <metainfo>
+    <metd>20220708</metd>
+    <metc>
+      <cntinfo>
+        <cntperp>
+          <cntper>Casey Lee</cntper>
+          <cntorg>USGS</cntorg>
+        </cntperp>
+        <cntaddr>
+          <addrtype>mailing and physical</addrtype>
+          <address>1217 Biltmore Drive</address>
+          <city>Lawrence</city>
+          <state>KS</state>
+          <postal>66049</postal>
+          <country>USA</country>
+        </cntaddr>
+        <cntvoice>785-832-3515</cntvoice>
+        <cntemail>cjlee@usgs.gov</cntemail>
+      </cntinfo>
+    </metc>
+    <metstdn>Content Standard for Digital Geospatial Metadata</metstdn>
+    <metstdv>FGDC-STD-001-1998</metstdv>
+  </metainfo>
+</metadata>

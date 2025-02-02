@@ -431,7 +431,7 @@ do_bottom %>%
   facet_wrap(~Year) + ## , scales = 'free_x'
   theme_bw() +
   # theme(axis.text.x = element_text(angle = 45, hjust = 1,vjust = 0.5)) +
-  ggtitle('Number of sample locations by month') + 
+  ggtitle('Number of sample locations by month - All data sources') + 
   ylab('Count') + xlab("Month")
   
 
@@ -440,7 +440,7 @@ ggsave(filename = pname, plot = last_plot(), width = 7*1.5, height = 4*1.5, unit
 ```
 
 
-```{r data desc - temporal - SEAMAP}
+```{r data desc - temporal - LUMCON}
 ### For each agency, sampling date 
 levels(do_bottom$Source)
 

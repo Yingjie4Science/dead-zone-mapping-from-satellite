@@ -24,7 +24,7 @@ https://code.earthengine.google.com/?accept_repo=users/yingjieli/DZT
 63_RF_Zilong_edited_20240506.ipynb
 64_Figure_importance_Var.Rmd ------------------------- Figure 4, S4, S7
 65_1_Figure_model_performance.Rmd -------------------- Figure 5
-65_2_errorMap.Rmd"
+65_2_errorMap.Rmd ------------------------------------ Figure 8b
 
 ## Supporting data                                     
 66_Figure_areaTimeseries_Maps.Rmd -------------------- Figure 6, 7, 9, 10
